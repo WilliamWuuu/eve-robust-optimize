@@ -227,6 +227,8 @@ We compare three experimental conditions, each run twice independently under ide
 
 The two EvE runs descend in near-lockstep, converging to almost identical final errors. The Static-Initial runs diverge: one eventually approaches EvE while the other plateaus at a higher level. Static-Final, despite starting from a higher-rated agent, suffers from phase mismatch: the frozen agent was optimized for the late stage of the original EvE run but a fresh search requires early-stage exploration strategies that this agent no longer carries. Continuous evolution is indispensable for both performance and robustness.
 
+The complete raw search traces for all six runs (every solver's source code, agent conversations, guidance updates, and evaluation scores) are available in the [v0.1.0 release](https://github.com/scaling-group/eve/releases/tag/v0.1.0).
+
 ## Citation
 
 ```bibtex
