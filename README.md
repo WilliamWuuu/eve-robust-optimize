@@ -116,6 +116,35 @@ In each iteration, EvE samples a set of high-performing working agents, along wi
 
 </details>
 
+### Workspace Layout
+
+Each agent runs in its own workspace. A solver workspace looks like:
+
+```text
+workspace/
+├── output/             # the solver candidate to edit; extracted as the submission
+├── guidance/           # optimizer guidance to apply and refine
+├── solver_examples/    # sampled reference solvers from the population (read-only)
+│   └── <solver_id>/
+│       ├── solver/         # that solver's files
+│       ├── logs/           # its evaluation logs
+│       └── score.yaml      # its score
+├── guidance_examples/  # sampled reference optimizer guidance (read-only)
+│   └── <optimizer_id>/
+│       ├── optimizer/      # that optimizer's guidance files
+│       ├── logs/           # its logs
+│       └── score.yaml      # its score
+├── logs/               # this run's optimization and evaluation logs
+└── README.md           # workspace-specific instructions (read first)
+```
+
+Knowledge sharing flows through the two `*_examples/` directories: before each
+run, EvE samples high-scoring solvers and optimizer guidance from the
+population and copies them into the workspace (read-only). This is how an agent
+learns from prior attempts. Each agent only reads its own injected examples;
+concurrent workers run an isolated race on the same reference set and do not
+communicate.
+
 ## Quick Start
 
 ```bash
