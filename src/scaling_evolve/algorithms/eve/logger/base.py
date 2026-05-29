@@ -13,7 +13,6 @@ from scaling_evolve.algorithms.eve.populations.entry import PopulationEntry
 from scaling_evolve.algorithms.eve.populations.score import scalar
 from scaling_evolve.algorithms.eve.workflow.optimize_logs import summarize_rollout_usage
 from scaling_evolve.algorithms.eve.workflow.phase2 import Phase2Result
-from scaling_evolve.algorithms.eve.workflow.phase4 import Phase4Result
 
 _USAGE_KEYS = (
     "model_cost_usd",
@@ -45,13 +44,10 @@ class EveLogger:
     def __init__(self, *, excluded_score_fields: list[str] | tuple[str, ...]) -> None:
         self._excluded_score_fields = set(excluded_score_fields)
         self._cumulative_phase2_usage = {key: 0.0 for key in _USAGE_KEYS}
-        self._cumulative_phase4_usage = {key: 0.0 for key in _USAGE_KEYS}
         self._cumulative_usage = {key: 0.0 for key in _USAGE_KEYS}
         self._cumulative_phase2_max_scores: dict[str, float] = {}
-        self._cumulative_phase4_max_scores: dict[str, float] = {}
         self._phase2_solver_rows: list[dict[str, object]] = []
         self._phase2_optimizer_rows: list[dict[str, object]] = []
-        self._phase4_optimizer_rows: list[dict[str, object]] = []
         self._best_solver_record: dict[str, Any] | None = None
         self._best_optimizer_record: dict[str, Any] | None = None
 
@@ -62,10 +58,6 @@ class EveLogger:
     @property
     def phase2_optimizer_rows(self) -> list[dict[str, object]]:
         return list(self._phase2_optimizer_rows)
-
-    @property
-    def phase4_optimizer_rows(self) -> list[dict[str, object]]:
-        return list(self._phase4_optimizer_rows)
 
     @classmethod
     def result_table_columns(cls, *, entry_kind: str) -> tuple[str, ...]:
@@ -83,7 +75,6 @@ class EveLogger:
         solver_entries: list[PopulationEntry],
         optimizer_entries: list[PopulationEntry],
         phase2_results: list[Phase2Result],
-        phase4_results: list[Phase4Result],
     ) -> None:
         raise NotImplementedError
 
@@ -103,7 +94,6 @@ class EveLogger:
         solver_entries: list[PopulationEntry],
         optimizer_entries: list[PopulationEntry],
         phase2_results: list[Phase2Result],
-        phase4_results: list[Phase4Result],
     ) -> dict[str, object]:
         projected_phase2_scores = [
             self._flatten_numeric_score(
@@ -113,26 +103,12 @@ class EveLogger:
             for result in phase2_results
             if result.produced_solver is not None
         ]
-        projected_phase4_scores = [
-            self._flatten_numeric_score(
-                result.produced_optimizer.score,
-                excluded_fields=self._excluded_score_fields,
-            )
-            for result in phase4_results
-            if result.produced_optimizer is not None
-        ]
         phase2_usage_totals = summarize_rollout_usage(
             [rollout for result in phase2_results for rollout in result.rollouts]
         )
-        phase4_usage_totals = summarize_rollout_usage(
-            [rollout for result in phase4_results for rollout in result.rollouts]
-        )
-        iteration_usage_totals = {
-            key: float(phase2_usage_totals[key] + phase4_usage_totals[key]) for key in _USAGE_KEYS
-        }
+        iteration_usage_totals = {key: float(phase2_usage_totals[key]) for key in _USAGE_KEYS}
         for key in _USAGE_KEYS:
             self._cumulative_phase2_usage[key] += float(phase2_usage_totals[key])
-            self._cumulative_phase4_usage[key] += float(phase4_usage_totals[key])
             self._cumulative_usage[key] += iteration_usage_totals[key]
         payload: dict[str, object] = {
             "iteration": iteration,
@@ -140,7 +116,6 @@ class EveLogger:
             "population/optimizer_size": len(optimizer_entries),
             **self._prefix_usage_metrics("usage/iteration", iteration_usage_totals),
             **self._prefix_usage_metrics("usage/cumulative/phase2", self._cumulative_phase2_usage),
-            **self._prefix_usage_metrics("usage/cumulative/phase4", self._cumulative_phase4_usage),
             **self._prefix_usage_metrics("usage/cumulative", self._cumulative_usage),
         }
         if phase2_results:
@@ -160,23 +135,6 @@ class EveLogger:
                 }
             )
             payload.update(self._prefix_usage_metrics("usage/phase2", phase2_usage_totals))
-        if phase4_results:
-            phase4_score_payload, phase4_iteration_max_scores, phase4_features = (
-                self._score_feature_metrics("phase4", projected_phase4_scores)
-            )
-            for feature, value in phase4_iteration_max_scores.items():
-                self._cumulative_phase4_max_scores[feature] = max(
-                    self._cumulative_phase4_max_scores.get(feature, value),
-                    value,
-                )
-            payload.update(phase4_score_payload)
-            payload.update(
-                {
-                    f"phase4/cumulative/max/{feature}": self._cumulative_phase4_max_scores[feature]
-                    for feature in phase4_features
-                }
-            )
-            payload.update(self._prefix_usage_metrics("usage/phase4", phase4_usage_totals))
 
         phase2_solver_rows = self._build_result_rows(
             iteration=iteration,
@@ -190,15 +148,8 @@ class EveLogger:
             result_attr="produced_optimizer",
             entry_kind="optimizer",
         )
-        phase4_optimizer_rows = self._build_result_rows(
-            iteration=iteration,
-            phase_results=phase4_results,
-            result_attr="produced_optimizer",
-            entry_kind="optimizer",
-        )
         self._phase2_solver_rows.extend(phase2_solver_rows)
         self._phase2_optimizer_rows.extend(phase2_optimizer_rows)
-        self._phase4_optimizer_rows.extend(phase4_optimizer_rows)
         self._update_best_entry_record(
             entries=solver_entries,
             iteration=iteration,
@@ -378,7 +329,7 @@ class EveLogger:
         self,
         *,
         iteration: int,
-        phase_results: list[Phase2Result] | list[Phase4Result],
+        phase_results: list[Phase2Result],
         result_attr: str,
         entry_kind: str,
     ) -> list[dict[str, object]]:

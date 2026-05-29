@@ -9,7 +9,6 @@ from pathlib import Path
 from scaling_evolve.algorithms.eve.logger.base import EveLogger
 from scaling_evolve.algorithms.eve.populations.entry import PopulationEntry
 from scaling_evolve.algorithms.eve.workflow.phase2 import Phase2Result
-from scaling_evolve.algorithms.eve.workflow.phase4 import Phase4Result
 
 
 def _csv_cell(value: object) -> str:
@@ -49,7 +48,6 @@ class CSVEveLogger(EveLogger):
         solver_entries: list[PopulationEntry],
         optimizer_entries: list[PopulationEntry],
         phase2_results: list[Phase2Result],
-        phase4_results: list[Phase4Result],
     ) -> None:
         if self._output_dir is None:
             return
@@ -58,19 +56,14 @@ class CSVEveLogger(EveLogger):
             solver_entries=solver_entries,
             optimizer_entries=optimizer_entries,
             phase2_results=phase2_results,
-            phase4_results=phase4_results,
         )
         phase2_solver_rows = self.phase2_solver_rows
         phase2_optimizer_rows = self.phase2_optimizer_rows
-        phase4_optimizer_rows = self.phase4_optimizer_rows
         self._iteration_rows.append(dict(payload))
         self._write_iteration_metrics_csv()
         self._rewrite_result_rows_csv("phase2_solvers.csv", phase2_solver_rows, entry_kind="solver")
         self._rewrite_result_rows_csv(
             "phase2_optimizers.csv", phase2_optimizer_rows, entry_kind="optimizer"
-        )
-        self._rewrite_result_rows_csv(
-            "phase4_optimizers.csv", phase4_optimizer_rows, entry_kind="optimizer"
         )
         self._write_summary(
             solver_entries=solver_entries,

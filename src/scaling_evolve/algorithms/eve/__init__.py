@@ -1,17 +1,17 @@
 """Eve: two-population co-evolution algorithm.
 
 Maintains a solver population T and an optimizer population O that co-evolve
-across an explicit 4-phase loop:
+across an explicit loop:
 
   Phase 1 — Sample optimizers I from O and solver examples J from T.
-  Phase 2 — Each optimizer in I produces a new solver candidate (parallelized).
+  Phase 2 — Each optimizer in I produces a new solver candidate (parallelized),
+            optionally producing a revised optimizer in the same step.
   Phase 3 — Pairwise Elo tournament updates optimizer ratings in O.
-  Phase 4 — Self-referential step: produce a new optimizer entry and add to O.
 
 Public surface:
 
     EveFactory   — assembles and runs the loop
-    Eve          — the 4-phase loop itself
+    Eve          — the co-evolution loop itself
     PopulationEntry     — unified entry type for both populations
 """
 

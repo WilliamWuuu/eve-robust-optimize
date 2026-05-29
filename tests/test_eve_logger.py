@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from scaling_evolve.algorithms.eve.logger.wandb import WandbEveLogger
 from scaling_evolve.algorithms.eve.populations.entry import PopulationEntry
 from scaling_evolve.algorithms.eve.workflow.phase2 import Phase2Result
-from scaling_evolve.algorithms.eve.workflow.phase4 import Phase4Result
 
 
 class _FakeRun:
@@ -75,7 +74,7 @@ def test_wandb_eve_logger_disabled_skips_sdk_load(monkeypatch) -> None:
     assert logger._run is None
 
 
-def test_wandb_eve_logger_logs_phase2_and_phase4(monkeypatch) -> None:
+def test_wandb_eve_logger_logs_phase2(monkeypatch) -> None:
     fake_sdk = _FakeSdk()
     monkeypatch.setattr(
         "scaling_evolve.algorithms.eve.logger.wandb._load_wandb_sdk",
@@ -158,83 +157,6 @@ def test_wandb_eve_logger_logs_phase2_and_phase4(monkeypatch) -> None:
             workspace_id="workspace-b",
         ),
     ]
-    phase4_results = [
-        Phase4Result(
-            lead_optimizer=PopulationEntry(
-                id="optimizer-lead",
-                files={"APPROACH.md": "lead"},
-                score={"elo": 1500.0},
-                logs={},
-            ),
-            sampled_optimizers=[
-                PopulationEntry(id="optimizer-a", files={}, score={"elo": 1400.0}, logs={}),
-                PopulationEntry(id="optimizer-b", files={}, score={"elo": 1450.0}, logs={}),
-            ],
-            prefill_optimizer=PopulationEntry(
-                id="optimizer-prefill",
-                files={"APPROACH.md": "prefill"},
-                score={"elo": 1425.0},
-                logs={},
-            ),
-            produced_optimizer=PopulationEntry(
-                id="optimizer-new",
-                files={"APPROACH.md": "new"},
-                score={"elo": 1425.0},
-                logs={},
-            ),
-            rollouts=[
-                SimpleNamespace(
-                    usage=SimpleNamespace(
-                        input_tokens=7,
-                        output_tokens=3,
-                        cache_read_tokens=0,
-                        cache_creation_tokens=1,
-                        agent_turns=1,
-                        model_cost_usd=0.75,
-                        wallclock_seconds=2.0,
-                    )
-                )
-            ],
-            workspace_id="workspace-123",
-        ),
-        Phase4Result(
-            lead_optimizer=PopulationEntry(
-                id="optimizer-lead-2",
-                files={"APPROACH.md": "lead-2"},
-                score={"elo": 1490.0},
-                logs={},
-            ),
-            sampled_optimizers=[
-                PopulationEntry(id="optimizer-a", files={}, score={"elo": 1400.0}, logs={}),
-            ],
-            prefill_optimizer=PopulationEntry(
-                id="optimizer-prefill-2",
-                files={"APPROACH.md": "prefill-2"},
-                score={"elo": 1410.0},
-                logs={},
-            ),
-            produced_optimizer=PopulationEntry(
-                id="optimizer-new-2",
-                files={"APPROACH.md": "new-2"},
-                score={"elo": 1410.0},
-                logs={},
-            ),
-            rollouts=[
-                SimpleNamespace(
-                    usage=SimpleNamespace(
-                        input_tokens=11,
-                        output_tokens=4,
-                        cache_read_tokens=2,
-                        cache_creation_tokens=0,
-                        agent_turns=2,
-                        model_cost_usd=0.25,
-                        wallclock_seconds=5.0,
-                    )
-                )
-            ],
-            workspace_id="workspace-456",
-        ),
-    ]
 
     logger.on_iteration(
         iteration=3,
@@ -252,7 +174,6 @@ def test_wandb_eve_logger_logs_phase2_and_phase4(monkeypatch) -> None:
             PopulationEntry(id="optimizer-new", files={}, score={"elo": 1425.0}, logs={}),
         ],
         phase2_results=phase2_results,
-        phase4_results=phase4_results,
     )
     logger.finish(
         solver_entries=[
@@ -273,18 +194,18 @@ def test_wandb_eve_logger_logs_phase2_and_phase4(monkeypatch) -> None:
     assert payload["phase2/iteration/mean/score"] == 1.875
     assert payload["phase2/iteration/max/score"] == 2.5
     assert payload["phase2/cumulative/max/score"] == 2.5
-    assert payload["usage/iteration/input_tokens"] == 48.0
-    assert payload["usage/iteration/output_tokens"] == 20.0
-    assert payload["usage/iteration/cache_read_tokens"] == 5.0
-    assert payload["usage/iteration/cache_creation_tokens"] == 4.0
-    assert payload["usage/iteration/agent_turns"] == 9.0
-    assert payload["usage/iteration/wallclock_seconds"] == 17.0
-    assert payload["usage/cumulative/input_tokens"] == 48.0
-    assert payload["usage/cumulative/output_tokens"] == 20.0
-    assert payload["usage/cumulative/cache_read_tokens"] == 5.0
-    assert payload["usage/cumulative/cache_creation_tokens"] == 4.0
-    assert payload["usage/cumulative/agent_turns"] == 9.0
-    assert payload["usage/cumulative/wallclock_seconds"] == 17.0
+    assert payload["usage/iteration/input_tokens"] == 30.0
+    assert payload["usage/iteration/output_tokens"] == 13.0
+    assert payload["usage/iteration/cache_read_tokens"] == 3.0
+    assert payload["usage/iteration/cache_creation_tokens"] == 3.0
+    assert payload["usage/iteration/agent_turns"] == 6.0
+    assert payload["usage/iteration/wallclock_seconds"] == 10.0
+    assert payload["usage/cumulative/input_tokens"] == 30.0
+    assert payload["usage/cumulative/output_tokens"] == 13.0
+    assert payload["usage/cumulative/cache_read_tokens"] == 3.0
+    assert payload["usage/cumulative/cache_creation_tokens"] == 3.0
+    assert payload["usage/cumulative/agent_turns"] == 6.0
+    assert payload["usage/cumulative/wallclock_seconds"] == 10.0
     assert payload["usage/phase2/input_tokens"] == 30
     assert payload["usage/phase2/output_tokens"] == 13
     assert payload["usage/phase2/cache_read_tokens"] == 3
@@ -292,20 +213,11 @@ def test_wandb_eve_logger_logs_phase2_and_phase4(monkeypatch) -> None:
     assert payload["usage/phase2/agent_turns"] == 6
     assert payload["usage/phase2/wallclock_seconds"] == 10.0
     assert payload["usage/phase2/model_cost_usd"] == 1.0
-    assert payload["usage/phase4/model_cost_usd"] == 1.0
-    assert payload["phase4/scores/elo"] == [1425.0, 1410.0]
-    assert payload["phase4/iteration/mean/elo"] == 1417.5
-    assert payload["phase4/iteration/max/elo"] == 1425.0
-    assert payload["phase4/cumulative/max/elo"] == 1425.0
-    assert payload["usage/phase4/input_tokens"] == 18
-    assert payload["usage/phase4/output_tokens"] == 7
-    assert payload["usage/phase4/agent_turns"] == 3
     assert payload["population/solver_size"] == 5
     assert payload["population/optimizer_size"] == 4
-    assert payload["usage/iteration/model_cost_usd"] == 2.0
+    assert payload["usage/iteration/model_cost_usd"] == 1.0
     assert payload["usage/cumulative/phase2/model_cost_usd"] == 1.0
-    assert payload["usage/cumulative/phase4/model_cost_usd"] == 1.0
-    assert payload["usage/cumulative/model_cost_usd"] == 2.0
+    assert payload["usage/cumulative/model_cost_usd"] == 1.0
     phase2_solver_table = payload["tables/phase2_solvers"]
     assert isinstance(phase2_solver_table, _FakeTable)
     assert "primary_score" not in phase2_solver_table.columns
@@ -331,15 +243,5 @@ def test_wandb_eve_logger_logs_phase2_and_phase4(monkeypatch) -> None:
         '{"elo": 1412.0, "note": "phase2 optimizer a"}'
     )
     assert phase2_optimizer_table.data[1][phase2_optimizer_score_json_idx] == '{"elo": 1398.0}'
-    phase4_optimizer_table = payload["tables/phase4_optimizers"]
-    assert isinstance(phase4_optimizer_table, _FakeTable)
-    assert "primary_score" not in phase4_optimizer_table.columns
-    assert "score_json" in phase4_optimizer_table.columns
-    assert "elo" not in phase4_optimizer_table.columns
-    assert "optimizer_id" in phase4_optimizer_table.columns
-    assert len(phase4_optimizer_table.data) == 2
-    phase4_score_json_idx = phase4_optimizer_table.columns.index("score_json")
-    assert phase4_optimizer_table.data[0][phase4_score_json_idx] == '{"elo": 1425.0}'
-    assert phase4_optimizer_table.data[1][phase4_score_json_idx] == '{"elo": 1410.0}'
     assert fake_sdk.run.summary["total_iterations"] == 8
     assert fake_sdk.finished is True

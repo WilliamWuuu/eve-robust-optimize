@@ -5,7 +5,6 @@ from __future__ import annotations
 from scaling_evolve.algorithms.eve.logger.base import EveLogger
 from scaling_evolve.algorithms.eve.populations.entry import PopulationEntry
 from scaling_evolve.algorithms.eve.workflow.phase2 import Phase2Result
-from scaling_evolve.algorithms.eve.workflow.phase4 import Phase4Result
 
 
 class CompositeEveLogger(EveLogger):
@@ -21,7 +20,6 @@ class CompositeEveLogger(EveLogger):
         solver_entries: list[PopulationEntry],
         optimizer_entries: list[PopulationEntry],
         phase2_results: list[Phase2Result],
-        phase4_results: list[Phase4Result],
     ) -> None:
         for logger in self._loggers:
             logger.on_iteration(
@@ -29,7 +27,6 @@ class CompositeEveLogger(EveLogger):
                 solver_entries=solver_entries,
                 optimizer_entries=optimizer_entries,
                 phase2_results=phase2_results,
-                phase4_results=phase4_results,
             )
 
     def finish(

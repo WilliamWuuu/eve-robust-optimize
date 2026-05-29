@@ -28,21 +28,6 @@ _LOOP_CFG = {
                 "scaling_evolve.algorithms.eve.instructions.default.Phase2AgentInstruction"
             ),
         },
-        "phase4_readme": {
-            "_target_": (
-                "scaling_evolve.algorithms.eve.instructions.default.Phase4ReadmeInstruction"
-            ),
-        },
-        "phase4_entrypoint": {
-            "_target_": (
-                "scaling_evolve.algorithms.eve.instructions.default.Phase4EntrypointInstruction"
-            ),
-        },
-        "phase4_agent": {
-            "_target_": (
-                "scaling_evolve.algorithms.eve.instructions.default.Phase4AgentInstruction"
-            ),
-        },
     },
 }
 
@@ -428,7 +413,6 @@ def test_icon_config_defaults() -> None:
         "configs/eve/prompt/templates/icon/phase2_self_optimize_readme.md"
     )
     assert cfg.loop.produce_optimizer_in_phase2 == cfg.loop.n_workers_phase2
-    assert cfg.loop.n_workers_phase4 == 0
 
 
 def test_icon_fixed_optimizer_disables_optimizer_evolution() -> None:
@@ -436,7 +420,6 @@ def test_icon_fixed_optimizer_disables_optimizer_evolution() -> None:
 
     assert cfg.loop.produce_optimizer_in_phase2 == 0
     assert cfg.loop.n_optimizer_examples_phase2 == 0
-    assert cfg.loop.n_workers_phase4 == 0
 
 
 def test_icon_smoke_config() -> None:
@@ -458,7 +441,6 @@ def test_circle_packing_config_defaults() -> None:
         "configs/eve/prompt/templates/built_in/phase2_self_optimize_readme.md"
     )
     assert cfg.loop.produce_optimizer_in_phase2 == cfg.loop.n_workers_phase2
-    assert cfg.loop.n_workers_phase4 == 0
 
 
 def test_circle_packing_smoke_config() -> None:

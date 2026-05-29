@@ -22,7 +22,7 @@ The factory constructs:
   - role-specific session drivers (spawn() only — no AgentProvider, no session store)
   - Two population instances (SolverPopulation + OptimizerPopulation)
     each backed by their own SQLiteLineageStore + FSArtifactStore
-  - SolverWorkspaceBuilder + OptimizerWorkspaceBuilder
+  - SolverWorkspaceBuilder
   - Eve
 
 LocalWorkspaceManager is not used. Workspace directories are created directly
@@ -54,9 +54,6 @@ from scaling_evolve.algorithms.eve.runtime.restore import (
 from scaling_evolve.algorithms.eve.workflow.evaluation import SolverEvaluator
 from scaling_evolve.algorithms.eve.workflow.loop import Eve
 from scaling_evolve.algorithms.eve.workspace.file_tree import read_file_tree
-from scaling_evolve.algorithms.eve.workspace.optimizer_workspace import (
-    OptimizerWorkspaceBuilder,
-)
 from scaling_evolve.algorithms.eve.workspace.solver_workspace import (
     SolverWorkspaceBuilder,
 )
@@ -189,10 +186,6 @@ class EveFactory:
             "solver_workspace_prefill",
             "phase2_optimizer_examples",
             "phase2_produced_optimizers",
-            "phase4_lead_optimizer",
-            "phase4_optimizer_examples",
-            "optimizer_workspace_prefill",
-            "optimizer_history_logs",
         )
         samplers = {
             key: instantiate(dict(loop_cfg.sampling[key]), _convert_="all") for key in sampling_keys
@@ -202,9 +195,6 @@ class EveFactory:
             "phase2_readme",
             "phase2_entrypoint",
             "phase2_agent",
-            "phase4_readme",
-            "phase4_entrypoint",
-            "phase4_agent",
         )
         instruction_cfg = {key: dict(config.prompt[key]) for key in instruction_fields}
         instructions = {
@@ -236,18 +226,10 @@ class EveFactory:
 
         # --- Workspace builders ---
         solver_ws_root = workspace_root / "solver_workspaces"
-        optimizer_ws_root = workspace_root / "optimizer_workspaces"
         if task_problem is None:
             raise ValueError("task_problem is required for Eve solver workspaces")
         solver_workspace_builder = SolverWorkspaceBuilder(
             solver_ws_root,
-            problem=task_problem,
-            config=loop_cfg,
-            instructions=instructions,
-            rollout_prompts=rollout_prompts,
-        )
-        optimizer_workspace_builder = OptimizerWorkspaceBuilder(
-            optimizer_ws_root,
             problem=task_problem,
             config=loop_cfg,
             instructions=instructions,
@@ -259,7 +241,6 @@ class EveFactory:
             solver_pop=solver_pop,
             optimizer_pop=optimizer_pop,
             solver_workspace_builder=solver_workspace_builder,
-            optimizer_workspace_builder=optimizer_workspace_builder,
             solver_driver=solver_driver,
             optimizer_driver=optimizer_driver,
             solver_evaluator=solver_evaluator,
@@ -271,10 +252,6 @@ class EveFactory:
             phase2_prefill_sampler=samplers["solver_workspace_prefill"],
             phase2_optimizer_examples_sampler=samplers["phase2_optimizer_examples"],
             phase2_produced_optimizer_sampler=samplers["phase2_produced_optimizers"],
-            phase4_lead_sampler=samplers["phase4_lead_optimizer"],
-            phase4_optimizer_examples_sampler=samplers["phase4_optimizer_examples"],
-            phase4_prefill_sampler=samplers["optimizer_workspace_prefill"],
-            phase4_history_log_sampler=samplers["optimizer_history_logs"],
             logger=logger,
         )
 

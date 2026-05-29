@@ -41,10 +41,6 @@ from scaling_evolve.algorithms.eve.workflow.phase2 import (
     phase2_boundary_repair_instruction,
 )
 from scaling_evolve.algorithms.eve.workflow.phase3 import score_optimizers
-from scaling_evolve.algorithms.eve.workflow.phase4 import Phase4BatchRunner, Phase4Runner
-from scaling_evolve.algorithms.eve.workspace.optimizer_workspace import (
-    OptimizerWorkspaceBuilder,
-)
 from scaling_evolve.algorithms.eve.workspace.solver_workspace import (
     SolverWorkspaceBuilder,
 )
@@ -59,11 +55,8 @@ def _make_test_config(workspace_root: Path | str = "run", **overrides) -> DictCo
     cfg = {
         "max_iterations": 2,
         "n_workers_phase2": 2,
-        "n_workers_phase4": 1,
         "n_solver_examples_phase2": 4,
         "n_optimizer_examples_phase2": 4,
-        "n_optimizer_examples_phase4": 2,
-        "n_logs_per_example_phase4": 8,
         "boundary_repair_attempts": 3,
         "enable_iter_snapshots": True,
         "iter_snapshot_retain": 3,
@@ -98,25 +91,6 @@ def _make_test_config(workspace_root: Path | str = "run", **overrides) -> DictCo
                 },
                 "replacement_mode": "no_replacement",
             },
-            "phase4_lead_optimizer": {
-                "_target_": f"{_RS}.RankSoftmaxSampler",
-                "temperature": 1.0,
-                "replacement_mode": "no_replacement",
-            },
-            "phase4_optimizer_examples": {
-                "_target_": f"{_RS}.RankSoftmaxSampler",
-                "temperature": 1.0,
-                "replacement_mode": "no_replacement",
-            },
-            "optimizer_workspace_prefill": {
-                "_target_": f"{_US}.UniformSampler",
-                "replacement_mode": "no_replacement",
-            },
-            "optimizer_history_logs": {
-                "_target_": f"{_RS}.RankSoftmaxSampler",
-                "temperature": 1.0,
-                "replacement_mode": "no_replacement",
-            },
         },
         "instructions": {
             "phase2_readme": {
@@ -133,25 +107,6 @@ def _make_test_config(workspace_root: Path | str = "run", **overrides) -> DictCo
             },
             "phase2_agent": {
                 "_target_": f"{_S}.instructions.default.Phase2AgentInstruction",
-                "file_list": [
-                    f"{base}/workspace_agent.md",
-                ],
-            },
-            "phase4_readme": {
-                "_target_": f"{_S}.instructions.default.Phase4ReadmeInstruction",
-                "file_list": [
-                    f"{base}/design_doc.md",
-                    f"{base}/phase4_readme.md",
-                    f"{base}/phase4_score_semantics.md",
-                    f"{base}/skills_doc.md",
-                ],
-            },
-            "phase4_entrypoint": {
-                "_target_": f"{_S}.instructions.default.Phase4EntrypointInstruction",
-                "file_list": [f"{base}/phase4_entrypoint.md"],
-            },
-            "phase4_agent": {
-                "_target_": f"{_S}.instructions.default.Phase4AgentInstruction",
                 "file_list": [
                     f"{base}/workspace_agent.md",
                 ],
@@ -237,9 +192,6 @@ def _instantiate_test_instructions(config: DictConfig) -> DictConfig:
         "phase2_readme",
         "phase2_entrypoint",
         "phase2_agent",
-        "phase4_readme",
-        "phase4_entrypoint",
-        "phase4_agent",
     ):
         value = config.instructions[field_name]
         if isinstance(value, (dict, DictConfig)):
@@ -259,9 +211,6 @@ def _instruction_objects(config: DictConfig) -> dict[str, object]:
             "phase2_readme",
             "phase2_entrypoint",
             "phase2_agent",
-            "phase4_readme",
-            "phase4_entrypoint",
-            "phase4_agent",
         )
     }
 
@@ -281,22 +230,6 @@ def _render_phase2_readme_for_test(
         solvers=solvers,
         prefill_solver=prefill_solver,
         optimizer_examples=optimizer_examples or [],
-    )
-
-
-def _render_phase4_readme_for_test(
-    config: DictConfig,
-    *,
-    optimizers: list[PopulationEntry],
-    prefill_optimizer_id: str,
-    lead_optimizer_id: str,
-) -> str:
-    lead_optimizer = next(entry for entry in optimizers if entry.id == lead_optimizer_id)
-    prefill_optimizer = next(entry for entry in optimizers if entry.id == prefill_optimizer_id)
-    return config.instructions["phase4_readme"].render(
-        lead_optimizer=lead_optimizer,
-        optimizers=optimizers,
-        prefill_optimizer=prefill_optimizer,
     )
 
 
@@ -386,12 +319,6 @@ def _make_loop(
         config=config,
         instructions=_instruction_objects(config),
     )
-    optimizer_workspace_builder = OptimizerWorkspaceBuilder(
-        tmp_path / "optimizer_workspaces",
-        problem=problem,
-        config=config,
-        instructions=_instruction_objects(config),
-    )
     solver_evaluator = build_solver_evaluator(
         problem,
         evaluation_failure_score={"score": 0.0, "summary": "evaluation failed"},
@@ -409,7 +336,6 @@ def _make_loop(
         solver_pop=solver_pop,  # type: ignore[arg-type]
         optimizer_pop=optimizer_pop,  # type: ignore[arg-type]
         solver_workspace_builder=solver_workspace_builder,
-        optimizer_workspace_builder=optimizer_workspace_builder,
         solver_driver=object(),  # type: ignore[arg-type]
         optimizer_driver=object(),  # type: ignore[arg-type]
         solver_evaluator=solver_evaluator,
@@ -421,10 +347,6 @@ def _make_loop(
         phase2_prefill_sampler=UniformSampler(replacement_mode="no_replacement"),
         phase2_optimizer_examples_sampler=UniformSampler(replacement_mode="no_replacement"),
         phase2_produced_optimizer_sampler=UniformSampler(replacement_mode="no_replacement"),
-        phase4_lead_sampler=UniformSampler(replacement_mode="no_replacement"),
-        phase4_optimizer_examples_sampler=UniformSampler(replacement_mode="no_replacement"),
-        phase4_prefill_sampler=UniformSampler(replacement_mode="no_replacement"),
-        phase4_history_log_sampler=UniformSampler(replacement_mode="no_replacement"),
     )
     return loop, solver_pop
 
@@ -443,18 +365,6 @@ def _minimal_instruction_overrides() -> dict[str, dict[str, object]]:
         },
         "phase2_agent": {
             "_target_": f"{_S}.instructions.default.Phase2AgentInstruction",
-            "file_list": [f"{base}/workspace_agent.md"],
-        },
-        "phase4_readme": {
-            "_target_": f"{_S}.instructions.default.Phase4ReadmeInstruction",
-            "file_list": [f"{base}/phase4_readme.md"],
-        },
-        "phase4_entrypoint": {
-            "_target_": f"{_S}.instructions.default.Phase4EntrypointInstruction",
-            "file_list": [f"{base}/phase4_entrypoint.md"],
-        },
-        "phase4_agent": {
-            "_target_": f"{_S}.instructions.default.Phase4AgentInstruction",
             "file_list": [f"{base}/workspace_agent.md"],
         },
     }
@@ -596,98 +506,6 @@ def test_seed_solver_skip_evaluation_normalizes_mapping_score_configs(tmp_path: 
     )
 
 
-def test_loop_skips_phase4_when_n_workers_phase4_is_non_positive(
-    tmp_path: Path, monkeypatch
-) -> None:
-    phase4_called = False
-
-    def eval_fn(workspace_root: Path, display_context=None):  # noqa: ARG001
-        _ = workspace_root, display_context
-        return _score(1.0), {"summary.txt": "ok\n"}
-
-    loop, _solver_pop = _make_loop(
-        tmp_path,
-        eval_fn=eval_fn,
-        instructions=_minimal_instruction_overrides(),
-        n_workers_phase4=0,
-    )
-
-    class _FakePhase2Result:
-        def __init__(self) -> None:
-            self.optimizer = PopulationEntry(
-                id="optimizer_seed",
-                files={"APPROACH.md": "seed\n"},
-                score=_optimizer_score(1500.0),
-                logs={},
-            )
-
-    def _fake_phase2_run(self):  # noqa: ANN001
-        _ = self
-        return [_FakePhase2Result()]
-
-    def _fake_phase4_run(self):  # noqa: ANN001
-        _ = self
-        nonlocal phase4_called
-        phase4_called = True
-        return []
-
-    monkeypatch.setattr(Phase2BatchRunner, "run", _fake_phase2_run)
-    monkeypatch.setattr(Phase4BatchRunner, "run", _fake_phase4_run)
-    monkeypatch.setattr(
-        "scaling_evolve.algorithms.eve.workflow.loop.score_optimizers",
-        lambda **kwargs: None,
-    )
-
-    loop.run()
-
-    assert phase4_called is False
-
-
-def test_loop_runs_phase4_when_n_workers_phase4_is_positive(tmp_path: Path, monkeypatch) -> None:
-    phase4_called = False
-
-    def eval_fn(workspace_root: Path, display_context=None):  # noqa: ARG001
-        _ = workspace_root, display_context
-        return _score(1.0), {"summary.txt": "ok\n"}
-
-    loop, _solver_pop = _make_loop(
-        tmp_path,
-        eval_fn=eval_fn,
-        instructions=_minimal_instruction_overrides(),
-        n_workers_phase4=1,
-    )
-
-    class _FakePhase2Result:
-        def __init__(self) -> None:
-            self.optimizer = PopulationEntry(
-                id="optimizer_seed",
-                files={"APPROACH.md": "seed\n"},
-                score=_optimizer_score(1500.0),
-                logs={},
-            )
-
-    def _fake_phase2_run(self):  # noqa: ANN001
-        _ = self
-        return [_FakePhase2Result()]
-
-    def _fake_phase4_run(self):  # noqa: ANN001
-        _ = self
-        nonlocal phase4_called
-        phase4_called = True
-        return []
-
-    monkeypatch.setattr(Phase2BatchRunner, "run", _fake_phase2_run)
-    monkeypatch.setattr(Phase4BatchRunner, "run", _fake_phase4_run)
-    monkeypatch.setattr(
-        "scaling_evolve.algorithms.eve.workflow.loop.score_optimizers",
-        lambda **kwargs: None,
-    )
-
-    loop.run()
-
-    assert phase4_called is True
-
-
 def test_loop_writes_wal_safe_iter_snapshots(tmp_path: Path, monkeypatch) -> None:
     def eval_fn(workspace_root: Path, display_context=None):  # noqa: ARG001
         _ = workspace_root, display_context
@@ -697,7 +515,6 @@ def test_loop_writes_wal_safe_iter_snapshots(tmp_path: Path, monkeypatch) -> Non
         tmp_path,
         eval_fn=eval_fn,
         instructions=_minimal_instruction_overrides(),
-        n_workers_phase4=0,
         enable_iter_snapshots=True,
         iter_snapshot_retain=2,
     )
@@ -1720,411 +1537,6 @@ def test_solver_workspace_exposes_context_skills_via_root_links(tmp_path: Path) 
     )
 
 
-def test_optimizer_workspace_exposes_context_skills_via_root_links(tmp_path: Path) -> None:
-    problem = _make_problem(tmp_path)
-    config = _make_test_config(workspace_root=tmp_path / "run")
-    builder = OptimizerWorkspaceBuilder(
-        tmp_path / "optimizer_workspaces",
-        problem=problem,
-        config=config,
-        instructions=_instruction_objects(config),
-    )
-    lead = PopulationEntry(
-        id="optimizer_0",
-        files={"skills/read-eval/SKILL.md": "skill body\n"},
-        score=_score(1500.0),
-        logs={},
-    )
-    candidate = PopulationEntry(
-        id="optimizer_1",
-        files={"read-eval.md": "candidate\n"},
-        score=_score(1490.0),
-        logs={},
-    )
-
-    workspace, _ = builder.build(lead, [candidate], "workspace")
-
-    assert (workspace / "guidance" / "skills" / "read-eval" / "SKILL.md").read_text(
-        encoding="utf-8"
-    ) == "skill body\n"
-    assert not (workspace / "skills").exists()
-    assert (workspace / ".claude" / "skills").is_symlink()
-    assert (workspace / ".codex" / "skills").is_symlink()
-    assert (workspace / ".claude" / "settings.local.json").exists()
-    assert ".claude-task-stopped" in (workspace / ".claude" / "settings.local.json").read_text(
-        encoding="utf-8"
-    )
-    assert (workspace / "task_base" / "candidate.py").exists()
-
-
-def test_optimizer_workspace_samples_solver_history_by_score_and_hides_step_ids(
-    tmp_path: Path,
-) -> None:
-    problem = _make_problem(tmp_path)
-
-    class _TopRankOnlyRandom:
-        def choice(self, seq):  # noqa: ANN001
-            return seq[0]
-
-        def choices(self, population, weights, k):  # noqa: ANN001, ARG002
-            _ = weights
-            return [population[0]]
-
-    config = _make_test_config(workspace_root=tmp_path / "run")
-    builder = OptimizerWorkspaceBuilder(
-        tmp_path / "optimizer_workspaces",
-        problem=problem,
-        config=config,
-        instructions=_instruction_objects(config),
-    )
-    lead = PopulationEntry(
-        id="optimizer_0",
-        files={"read-eval.md": "base\n"},
-        score=_score(1500.0),
-        logs={},
-    )
-    candidate = PopulationEntry(
-        id="optimizer_1",
-        files={"read-eval.md": "candidate\n"},
-        score=_score(1490.0),
-        logs={
-            "step_1_solver_a/solver/candidate.py": "v1\n",
-            "step_1_solver_a/score.yaml": (
-                "solver_id: solver_a\nscore:\n  score: 9.0\n  summary: score=9.0\n"
-            ),
-            "step_2_solver_b/score.yaml": (
-                "solver_id: solver_b\nscore:\n  score: 1.0\n  summary: score=1.0\n"
-            ),
-            "step_2_solver_b/solver/candidate.py": "v2\n",
-            "step_3_solver_c/score.yaml": (
-                "solver_id: solver_c\nscore:\n  score: 8.0\n  summary: score=8.0\n"
-            ),
-            "step_3_solver_c/solver/candidate.py": "v3\n",
-            "notes.txt": "keep\n",
-        },
-    )
-
-    batch_runner = Phase4BatchRunner(
-        optimizer_workspace_builder=builder,
-        driver=object(),  # type: ignore[arg-type]
-        step_label="step_1",
-        iteration=1,
-        optimizer_pop=SimpleNamespace(_rng=_TopRankOnlyRandom()),  # type: ignore[arg-type]
-        lead_sampler=UniformSampler(replacement_mode="no_replacement"),
-        optimizer_examples_sampler=UniformSampler(replacement_mode="no_replacement"),
-        prefill_sampler=UniformSampler(replacement_mode="no_replacement"),
-        history_log_sampler=RankSoftmaxSampler(
-            temperature=1.0,
-            replacement_mode="no_replacement",
-        ),
-        n_workers_phase4=1,
-        n_optimizer_examples_phase4=1,
-        n_latest_solver_logs=2,
-    )
-    workspace, _ = builder.build(
-        lead,
-        [candidate],
-        "workspace",
-        example_logs_by_optimizer=batch_runner._sample_example_logs([candidate]),  # noqa: SLF001
-    )
-
-    logs_root = workspace / "examples" / "optimizer_1" / "logs"
-    assert (logs_root / "notes.txt").read_text(encoding="utf-8") == "keep\n"
-    assert not (logs_root / "step_1_solver_a").exists()
-    assert not (logs_root / "step_2_solver_b").exists()
-    assert not (logs_root / "step_3_solver_c").exists()
-    selected_dirs = sorted(path.name for path in logs_root.iterdir() if path.is_dir())
-    assert len(selected_dirs) == 2
-    assert all(name.startswith("solver_") for name in selected_dirs)
-    selected_solver_ids = {
-        yaml.safe_load((logs_root / name / "score.yaml").read_text(encoding="utf-8"))["solver_id"]
-        for name in selected_dirs
-    }
-    assert selected_solver_ids == {"solver_a", "solver_c"}
-    manifest = yaml.safe_load((workspace / "score.yaml").read_text(encoding="utf-8"))
-    assert manifest["sampled_solver_history_ids"] == ["solver_a", "solver_c"]
-
-
-def test_optimizer_workspace_score_manifest_records_sampled_solver_history_ids(
-    tmp_path: Path,
-) -> None:
-    problem = _make_problem(tmp_path)
-    config = _instantiate_test_instructions(_make_test_config(workspace_root=tmp_path / "run"))
-    builder = OptimizerWorkspaceBuilder(
-        tmp_path / "optimizer_workspaces",
-        problem=problem,
-        config=config,
-        instructions=_instruction_objects(config),
-    )
-    workspace = tmp_path / "optimizer_workspaces" / "workspace"
-    lead = PopulationEntry(
-        id="opt-1",
-        files={"read-eval.md": "guidance"},
-        score=_score(1500.0),
-        logs={},
-    )
-    sampled = PopulationEntry(
-        id="opt-2",
-        files={"read-eval.md": "sampled"},
-        score=_score(1490.0),
-        logs={},
-    )
-    produced = PopulationEntry(
-        id="opt-3",
-        files={"read-eval.md": "produced"},
-        score=_score(1490.0),
-        logs={},
-    )
-
-    builder.write_score_manifest(
-        workspace,
-        sampled_optimizers=[sampled],
-        sampled_solver_history_ids=["solver_a", "solver_c"],
-        lead_optimizer=lead,
-        prefill_optimizer=sampled,
-        produced_optimizer=produced,
-    )
-
-    manifest = yaml.safe_load((workspace / "score.yaml").read_text(encoding="utf-8"))
-    assert manifest["sampled_solver_history_ids"] == ["solver_a", "solver_c"]
-
-
-def test_optimizer_workspace_feature_mode_sampling_keeps_opaque_score_labels(
-    tmp_path: Path,
-) -> None:
-    problem = _make_problem(tmp_path)
-
-    class _TopRankOnlyRandom:
-        def choice(self, seq):  # noqa: ANN001
-            return seq[0]
-
-        def choices(self, population, weights, k):  # noqa: ANN001, ARG002
-            _ = weights
-            return [population[0]]
-
-    config = _make_test_config(
-        workspace_root=tmp_path / "run",
-    )
-    builder = OptimizerWorkspaceBuilder(
-        tmp_path / "optimizer_workspaces",
-        problem=problem,
-        config=config,
-        instructions=_instruction_objects(config),
-    )
-    lead = PopulationEntry(
-        id="optimizer_0",
-        files={"read-eval.md": "base\n"},
-        score={"score": 1500.0, "quality": 1500.0, "speed": 1500.0},
-        logs={},
-    )
-    candidate = PopulationEntry(
-        id="optimizer_1",
-        files={"read-eval.md": "candidate\n"},
-        score={"score": 1490.0, "quality": 1490.0, "speed": 1490.0},
-        logs={
-            "step_1_solver_a/score.yaml": (
-                "solver_id: solver_a\n"
-                "score:\n"
-                "  score: 99.0\n"
-                "  quality: 1.0\n"
-                "  speed: 2.0\n"
-                "  summary: a\n"
-            ),
-            "step_1_solver_a/logs/evaluate/score.yaml": (
-                "score: 99.0\nquality: 1.0\nspeed: 2.0\nsummary: a\n"
-            ),
-            "step_1_solver_a/solver/candidate.py": "a\n",
-            "step_2_solver_b/score.yaml": (
-                "solver_id: solver_b\n"
-                "score:\n"
-                "  score: 0.0\n"
-                "  quality: 8.0\n"
-                "  speed: 10.0\n"
-                "  summary: b\n"
-            ),
-            "step_2_solver_b/logs/evaluate/score.yaml": (
-                "score: 0.0\nquality: 8.0\nspeed: 10.0\nsummary: b\n"
-            ),
-            "step_2_solver_b/solver/candidate.py": "b\n",
-        },
-    )
-
-    batch_runner = Phase4BatchRunner(
-        optimizer_workspace_builder=builder,
-        driver=object(),  # type: ignore[arg-type]
-        step_label="step_1",
-        iteration=1,
-        optimizer_pop=SimpleNamespace(_rng=_TopRankOnlyRandom()),  # type: ignore[arg-type]
-        lead_sampler=UniformSampler(replacement_mode="no_replacement"),
-        optimizer_examples_sampler=UniformSampler(replacement_mode="no_replacement"),
-        prefill_sampler=UniformSampler(replacement_mode="no_replacement"),
-        history_log_sampler=RankSoftmaxSampler(
-            temperature=1.0,
-            replacement_mode="no_replacement",
-        ),
-        n_workers_phase4=1,
-        n_optimizer_examples_phase4=1,
-        n_latest_solver_logs=1,
-    )
-    workspace, _ = builder.build(
-        lead,
-        [candidate],
-        "workspace",
-        example_logs_by_optimizer=batch_runner._sample_example_logs([candidate]),  # noqa: SLF001
-    )
-    logs_root = workspace / "examples" / "optimizer_1" / "logs"
-    selected_dirs = [path.name for path in logs_root.iterdir() if path.is_dir()]
-    assert len(selected_dirs) == 1
-    assert selected_dirs[0].startswith("solver_")
-
-
-def test_phase4_parallel_runs_multiple_optimizer_updates(tmp_path: Path) -> None:
-    problem = _make_problem(tmp_path)
-    config = _instantiate_test_instructions(
-        _make_test_config(
-            workspace_root=tmp_path / "run",
-            n_workers_phase4=2,
-            n_optimizer_examples_phase4=1,
-        )
-    )
-    builder = OptimizerWorkspaceBuilder(
-        tmp_path / "optimizer_workspaces",
-        problem=problem,
-        config=config,
-        instructions=_instruction_objects(config),
-    )
-
-    class _Phase4Driver:
-        def spawn(self, seed: object) -> object:
-            workspace = Path(seed.working_directory)
-            optimize_dir = workspace / "logs" / "optimize"
-            optimize_dir.mkdir(parents=True, exist_ok=True)
-            (optimize_dir / "agent-note.txt").write_text("optimizer log\n", encoding="utf-8")
-            return SimpleNamespace(
-                summary="phase4 transcript",
-                state=SimpleNamespace(),
-                usage=SimpleNamespace(
-                    input_tokens=12,
-                    output_tokens=4,
-                    cache_read_tokens=2,
-                    cache_creation_tokens=0,
-                    agent_turns=1,
-                    model_cost_usd=0.3,
-                    wallclock_seconds=3.0,
-                ),
-            )
-
-    class _OptimizerPopulation:
-        def __init__(self, entries: list[PopulationEntry]) -> None:
-            self._entries = list(entries)
-            self._rng = random.Random(0)
-
-        def entries(self) -> list[PopulationEntry]:
-            return list(self._entries)
-
-        def add(self, entry: PopulationEntry) -> None:
-            self._entries.append(entry)
-
-    class _HeadSampler:
-        def sample(self, entries, scores, n, rng):  # noqa: ANN001, ARG002
-            _ = scores
-            _ = rng
-            return list(entries[:n])
-
-    optimizer_entries = [
-        PopulationEntry(
-            id="optimizer_1",
-            files={"APPROACH.md": "one\n"},
-            score={"elo": 1500.0},
-            logs={},
-        ),
-        PopulationEntry(
-            id="optimizer_2",
-            files={"APPROACH.md": "two\n"},
-            score={"elo": 1490.0},
-            logs={},
-        ),
-        PopulationEntry(
-            id="optimizer_3",
-            files={"APPROACH.md": "three\n"},
-            score={"elo": 1480.0},
-            logs={},
-        ),
-    ]
-    optimizer_pop = _OptimizerPopulation(optimizer_entries)
-    phase4_results = Phase4BatchRunner(
-        optimizer_workspace_builder=builder,
-        driver=_Phase4Driver(),  # type: ignore[arg-type]
-        step_label="step_1",
-        iteration=1,
-        optimizer_pop=optimizer_pop,
-        lead_sampler=_HeadSampler(),
-        optimizer_examples_sampler=_HeadSampler(),
-        prefill_sampler=UniformSampler(replacement_mode="no_replacement"),
-        history_log_sampler=RankSoftmaxSampler(
-            temperature=1.0,
-            replacement_mode="no_replacement",
-        ),
-        n_workers_phase4=2,
-        n_optimizer_examples_phase4=1,
-        n_latest_solver_logs=8,
-    ).run()
-
-    assert len(phase4_results) == 2
-    assert [result.lead_optimizer.id for result in phase4_results] == ["optimizer_1", "optimizer_2"]
-    assert all(result.produced_optimizer is not None for result in phase4_results)
-    assert all(result.rollouts for result in phase4_results)
-
-    assert len(optimizer_pop.entries()) == 5
-    produced_ids = [
-        result.produced_optimizer.id
-        for result in phase4_results
-        if result.produced_optimizer is not None
-    ]
-    assert set(produced_ids).issubset({entry.id for entry in optimizer_pop.entries()})
-
-
-def test_phase4_system_prompt_omits_removed_important_message(tmp_path: Path) -> None:
-    problem = _make_problem(tmp_path)
-    driver = _FakeDriver()
-    config = _instantiate_test_instructions(_make_test_config(workspace_root=tmp_path / "run"))
-    builder = OptimizerWorkspaceBuilder(
-        tmp_path / "optimizer_workspaces",
-        problem=problem,
-        config=config,
-        instructions=_instruction_objects(config),
-    )
-    lead = PopulationEntry(
-        id="opt-1",
-        files={"APPROACH.md": "lead"},
-        score=_score(1500.0),
-        logs={},
-    )
-    sampled = PopulationEntry(
-        id="opt-2",
-        files={"APPROACH.md": "sample"},
-        score=_score(1490.0),
-        logs={},
-    )
-
-    Phase4Runner(
-        optimizer_workspace_builder=builder,
-        driver=driver,
-        step_label="step_4",
-        iteration=1,
-    ).run_single(
-        lead=lead,
-        sampled_optimizers=[sampled],
-        prefill_optimizer=sampled,
-        example_logs_by_optimizer={},
-        worker_index=1,
-    )
-
-    assert len(driver.spawn_instructions) == 1
-    assert "Read `README.md` first and follow it." in driver.spawn_instructions[0]
-    assert "VERY IMPORTANT RULE" not in driver.spawn_instructions[0]
-
-
 def test_readme_renders_current_score_shape(tmp_path: Path) -> None:
     optimizer = PopulationEntry(
         id="opt-1",
@@ -2603,101 +2015,6 @@ def test_indexed_phase2_readme_uses_worker_index_modulo(tmp_path: Path) -> None:
     assert "Variant B" in wrapped_instruction
 
 
-def test_optimizer_readme_says_output_guides_phase2_not_phase4() -> None:
-    lead = PopulationEntry(
-        id="opt-1",
-        files={"read-eval.md": "guidance"},
-        score=_score(1500.0),
-        logs={},
-    )
-    candidate = PopulationEntry(
-        id="opt-2",
-        files={"read-eval.md": "guidance"},
-        score=_score(1490.0),
-        logs={},
-    )
-
-    config = _instantiate_test_instructions(_make_test_config(workspace_root=Path("run")))
-    _ = (lead, "empty")
-    instruction = _render_phase4_readme_for_test(
-        config,
-        optimizers=[lead, candidate],
-        lead_optimizer_id="opt-1",
-        prefill_optimizer_id="opt-2",
-    )
-
-    assert "they will later be copied into Phase 2 solver workspaces" in instruction
-    assert "solver-optimization agent" in instruction
-    assert "copied into the Phase 2 `guidance/` folder" in instruction
-    assert "Use the reference optimizers and the current `output/` files together" in instruction
-    assert "Write any important optimization notes" in instruction
-    assert "save your final response there" in instruction
-    assert "## Skills Convention" in instruction
-    assert "Recommended `SKILL.md` shape:" in instruction
-    assert 'description: "<one-line summary>"' in instruction
-    assert "output/\n└── skills/" in instruction
-    assert "Treat `guidance/` as supporting guidance, if it exists" in instruction
-
-
-def test_optimizer_readme_includes_configured_score_explanation() -> None:
-    lead = PopulationEntry(
-        id="opt-1",
-        files={"read-eval.md": "guidance"},
-        score=_score(1500.0),
-        logs={},
-    )
-    candidate = PopulationEntry(
-        id="opt-2",
-        files={"read-eval.md": "guidance"},
-        score=_score(1490.0),
-        logs={},
-    )
-
-    config = _instantiate_test_instructions(
-        _make_test_config(
-            workspace_root=Path("run"),
-        )
-    )
-    _ = (lead, "empty")
-    instruction = _render_phase4_readme_for_test(
-        config,
-        optimizers=[lead, candidate],
-        lead_optimizer_id="opt-1",
-        prefill_optimizer_id="opt-2",
-    )
-
-    assert "## Score Semantics" in instruction
-    assert "Higher optimizer Elo is better." in instruction
-
-
-def test_optimizer_readme_omits_removed_phase4_important_message() -> None:
-    lead = PopulationEntry(
-        id="opt-1",
-        files={"read-eval.md": "guidance"},
-        score=_score(1500.0),
-        logs={},
-    )
-    candidate = PopulationEntry(
-        id="opt-2",
-        files={"read-eval.md": "guidance"},
-        score=_score(1490.0),
-        logs={},
-    )
-
-    config = _instantiate_test_instructions(_make_test_config(workspace_root=Path("run")))
-    _ = (lead, "empty")
-    instruction = _render_phase4_readme_for_test(
-        config,
-        optimizers=[lead, candidate],
-        lead_optimizer_id="opt-1",
-        prefill_optimizer_id="opt-2",
-    )
-
-    assert "VERY IMPORTANT RULE" not in instruction
-    assert "Don't keep improving!" not in instruction
-    assert "Do not ask the human for clarification, approval, or feedback" in instruction
-
-
 def test_boundary_check_allows_editable_folder_changes(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline"
     candidate = tmp_path / "candidate"
@@ -2828,27 +2145,6 @@ def test_solver_workspace_name_uses_underscore_timestamp_format(tmp_path: Path) 
     )
 
     workspace, _ = builder.build({}, [], workspace_id="workspace-1")
-
-    timestamp_prefix = workspace.name.split("_workspace-1", maxsplit=1)[0]
-    assert "T" not in timestamp_prefix
-    assert len(timestamp_prefix) == len("20260411_175422")
-
-
-def test_optimizer_workspace_name_uses_underscore_timestamp_format(tmp_path: Path) -> None:
-    problem = _make_problem(tmp_path)
-    config = _make_test_config(workspace_root=tmp_path / "run")
-    builder = OptimizerWorkspaceBuilder(
-        tmp_path / "optimizer_workspaces",
-        problem=problem,
-        config=config,
-        instructions=_instruction_objects(config),
-    )
-
-    workspace, _ = builder.build(
-        PopulationEntry(id="lead", files={"optimizer.py": "pass\n"}, score={"elo": 1.0}, logs={}),
-        [],
-        workspace_id="workspace-1",
-    )
 
     timestamp_prefix = workspace.name.split("_workspace-1", maxsplit=1)[0]
     assert "T" not in timestamp_prefix

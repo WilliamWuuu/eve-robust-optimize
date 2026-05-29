@@ -12,7 +12,7 @@ sampling:
       score:
         weight: 1.0
         temperature: 1.0
-  phase4_lead_optimizer:
+  phase2_optimizer_examples:
     _target_:
       scaling_evolve.algorithms.eve.populations.samplers.rank_softmax.RankSoftmaxSampler
     temperature: 1.0

@@ -9,7 +9,6 @@ from typing import Any
 from scaling_evolve.algorithms.eve.logger.base import EveLogger
 from scaling_evolve.algorithms.eve.populations.entry import PopulationEntry
 from scaling_evolve.algorithms.eve.workflow.phase2 import Phase2Result
-from scaling_evolve.algorithms.eve.workflow.phase4 import Phase4Result
 
 _LOG = logging.getLogger(__name__)
 
@@ -76,7 +75,6 @@ class WandbEveLogger(EveLogger):
         solver_entries: list[PopulationEntry],
         optimizer_entries: list[PopulationEntry],
         phase2_results: list[Phase2Result],
-        phase4_results: list[Phase4Result],
     ) -> None:
         if self._sdk is None or self._run is None:
             return
@@ -85,7 +83,6 @@ class WandbEveLogger(EveLogger):
             solver_entries=solver_entries,
             optimizer_entries=optimizer_entries,
             phase2_results=phase2_results,
-            phase4_results=phase4_results,
         )
         if self.phase2_solver_rows:
             payload["tables/phase2_solvers"] = self._build_result_table(
@@ -95,11 +92,6 @@ class WandbEveLogger(EveLogger):
         if self.phase2_optimizer_rows:
             payload["tables/phase2_optimizers"] = self._build_result_table(
                 self.phase2_optimizer_rows,
-                entry_kind="optimizer",
-            )
-        if self.phase4_optimizer_rows:
-            payload["tables/phase4_optimizers"] = self._build_result_table(
-                self.phase4_optimizer_rows,
                 entry_kind="optimizer",
             )
         self._sdk.log(payload, step=iteration)
@@ -128,10 +120,8 @@ class WandbEveLogger(EveLogger):
         self._sdk.define_metric("population/*", step_metric="iteration")
         for prefix in (
             "usage/phase2",
-            "usage/phase4",
             "usage/iteration",
             "usage/cumulative/phase2",
-            "usage/cumulative/phase4",
             "usage/cumulative",
         ):
             summary = "last" if prefix.startswith("usage/cumulative") else None
@@ -152,9 +142,6 @@ class WandbEveLogger(EveLogger):
         self._sdk.define_metric("phase2/*", step_metric="iteration")
         self._sdk.define_metric("phase2/iteration/*", step_metric="iteration")
         self._sdk.define_metric("phase2/cumulative/*", step_metric="iteration", summary="last")
-        self._sdk.define_metric("phase4/*", step_metric="iteration")
-        self._sdk.define_metric("phase4/iteration/*", step_metric="iteration")
-        self._sdk.define_metric("phase4/cumulative/*", step_metric="iteration", summary="last")
 
         run_url = getattr(self._run, "url", None)
         if isinstance(run_url, str) and run_url:
