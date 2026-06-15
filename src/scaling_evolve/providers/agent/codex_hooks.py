@@ -177,18 +177,28 @@ def render_trusted_hook_state_toml(
     hooks_json_path: str | Path | None,
     *,
     config_path: Path | None = None,
+    trust_key_hooks_json_path: str | Path | None = None,
 ) -> str:
     """Render matching real-home hook trust entries for an isolated Codex config."""
 
     if hooks_json_path is None:
         return ""
-    entries = read_trusted_hook_state(hooks_json_path, config_path=config_path)
+    source_hooks_path = str(Path(hooks_json_path).expanduser().resolve())
+    target_hooks_path = str(
+        Path(trust_key_hooks_json_path or hooks_json_path).expanduser().resolve()
+    )
+    entries = read_trusted_hook_state(source_hooks_path, config_path=config_path)
     if not entries:
         return ""
     lines: list[str] = []
-    for key in _ordered_trust_keys(str(Path(hooks_json_path).expanduser().resolve()), entries):
+    for key in _ordered_trust_keys(source_hooks_path, entries):
         values = entries[key]
-        lines.append(f"[hooks.state.{json.dumps(key)}]")
+        rendered_key = _rewrite_hook_trust_key(
+            key,
+            source_hooks_path=source_hooks_path,
+            target_hooks_path=target_hooks_path,
+        )
+        lines.append(f"[hooks.state.{json.dumps(rendered_key)}]")
         for field_name, field_value in values.items():
             if not isinstance(field_name, str):
                 continue
@@ -207,6 +217,18 @@ def _ordered_trust_keys(hooks_json_path: str, entries: dict[str, dict[str, Any]]
             ordered.append(key)
     ordered.extend(sorted(key for key in entries if key not in set(ordered)))
     return ordered
+
+
+def _rewrite_hook_trust_key(
+    key: str,
+    *,
+    source_hooks_path: str,
+    target_hooks_path: str,
+) -> str:
+    prefix = f"{source_hooks_path}:"
+    if not key.startswith(prefix):
+        return key
+    return f"{target_hooks_path}:{key[len(prefix) :]}"
 
 
 def _trust_error_message(repo_root: Path) -> str:

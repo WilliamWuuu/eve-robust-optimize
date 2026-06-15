@@ -17,7 +17,9 @@ class CodexLaunchConfig:
 
     worktree_root: Path
     hooks_json_path: Path | None = None
+    hook_trust_source_path: Path | None = None
     trusted_project_roots: tuple[Path, ...] = ()
+    project_root_markers: tuple[str, ...] | None = ()
 
 
 @dataclass(frozen=True)
@@ -32,7 +34,7 @@ class IsolatedCodexHome:
     def env(self) -> dict[str, str]:
         """Return the environment variables needed for Codex launch."""
 
-        return {"HOME": str(self.root)}
+        return {"HOME": str(self.root), "CODEX_HOME": str(self.codex_dir)}
 
 
 def create_isolated_codex_home(
@@ -190,11 +192,25 @@ def extract_usage(session_jsonl: Path, *, from_line: int = 0) -> dict[str, int]:
 
 def _render_config_toml(launch: CodexLaunchConfig) -> str:
     trusted_projects = _trusted_project_roots(launch)
-    config_text = "[features]\nhooks = true\n\n" + "\n".join(
-        f'[projects.{json.dumps(str(project_root))}]\ntrust_level = "trusted"\n'
-        for project_root in trusted_projects
+    lines: list[str] = []
+    if launch.project_root_markers is not None:
+        lines.append(f"project_root_markers = {json.dumps(list(launch.project_root_markers))}")
+        lines.append("")
+    lines.extend(["[features]", "hooks = true", ""])
+    for project_root in trusted_projects:
+        lines.extend(
+            [
+                f"[projects.{json.dumps(str(project_root))}]",
+                'trust_level = "trusted"',
+                "",
+            ]
+        )
+    config_text = "\n".join(lines).rstrip() + "\n"
+    trust_source_path = launch.hook_trust_source_path or launch.hooks_json_path
+    trust_state = render_trusted_hook_state_toml(
+        trust_source_path,
+        trust_key_hooks_json_path=launch.hooks_json_path,
     )
-    trust_state = render_trusted_hook_state_toml(launch.hooks_json_path)
     if trust_state:
         config_text = f"{config_text}\n{trust_state}"
     return config_text

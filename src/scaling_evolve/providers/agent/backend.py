@@ -28,9 +28,7 @@ from scaling_evolve.core.mutation import (
 )
 from scaling_evolve.core.storage.models import ArtifactRef, MaterializationRef
 from scaling_evolve.providers.agent.codex_hooks import (
-    repo_codex_hooks_path,
     workspace_hook_command,
-    write_codex_hooks_file,
 )
 from scaling_evolve.providers.agent.compaction import compact_metadata_from_transcript
 from scaling_evolve.providers.agent.config import AgentProviderConfig
@@ -55,6 +53,17 @@ from scaling_evolve.storage.artifacts import FSArtifactStore
 from scaling_evolve.storage.manifests import ChangedFilesManifest
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _default_eve_prompt_root() -> Path:
+    return (
+        Path(__file__).resolve().parents[4]
+        / "configs"
+        / "eve"
+        / "optimizer"
+        / "circle_packing"
+        / "prompt"
+    )
 
 
 def _as_mapping(value: object) -> Mapping[str, JSONValue] | None:
@@ -333,8 +342,6 @@ class AgentProvider:
         self._write_workspace_rollout_prompt_config(runtime_root)
         if self.config.driver in {"claude_code", "claude_code_tmux"}:
             self._write_workspace_claude_settings(runtime_root)
-        if self.config.driver in {"codex_cli", "codex_tmux", "codex_exec"}:
-            self._write_workspace_codex_hooks(runtime_root)
         self._write_workspace_recovery_guidance(runtime_root, request)
 
     def _sync_workspace_tree_to_session_cwd(
@@ -467,11 +474,6 @@ class AgentProvider:
             encoding="utf-8",
         )
 
-    def _write_workspace_codex_hooks(self, workspace_root: Path) -> None:
-        if repo_codex_hooks_path().exists():
-            return
-        write_codex_hooks_file(workspace_root / ".codex" / "hooks.json")
-
     def _write_workspace_rollout_prompt_config(self, workspace_root: Path) -> None:
         from scaling_evolve.algorithms.eve.rollout_prompts.default import (
             BudgetPrompt,
@@ -480,7 +482,7 @@ class AgentProvider:
 
         prompts: list[dict[str, object]] = []
         if self.config.budget_prompt and self.config.rollout_max_turns > 0:
-            budget_prompt = BudgetPrompt()
+            budget_prompt = BudgetPrompt(prompt_root=_default_eve_prompt_root())
             ctx = PromptContext(
                 workspace=workspace_root,
                 rollout_max_turns=self.config.rollout_max_turns,

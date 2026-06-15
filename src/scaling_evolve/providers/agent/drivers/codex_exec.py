@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from scaling_evolve.core.engine import RuntimeStateRef
 from scaling_evolve.core.mutation import ProviderUsage
-from scaling_evolve.providers.agent.codex_hooks import repo_codex_hooks_path
+from scaling_evolve.providers.agent.codex_hooks import repo_codex_hooks_path, write_codex_hooks_file
 from scaling_evolve.providers.agent.codex_isolation import (
     CodexLaunchConfig,
     IsolatedCodexHome,
@@ -226,7 +226,7 @@ class CodexExecSessionDriver(SessionDriver):
         raw_command_result = self._run_command(
             command=argv,
             cwd=worktree_root,
-            env={**isolated_home.env(), **self.provider_env},
+            env={**self.provider_env, **isolated_home.env()},
             stdout_live_path=driver_stdout_live_path,
         )
         command_result = (
@@ -614,11 +614,12 @@ class CodexExecSessionDriver(SessionDriver):
         return cwd / ".codex-driver-home"
 
     def _launch_config(self, worktree_root: Path) -> CodexLaunchConfig:
-        hooks_json_path = repo_codex_hooks_path()
+        hooks_json_path = worktree_root / ".codex" / "hooks.json"
+        write_codex_hooks_file(hooks_json_path)
         return CodexLaunchConfig(
             worktree_root=worktree_root,
             hooks_json_path=hooks_json_path,
-            trusted_project_roots=(hooks_json_path.parent.parent,),
+            hook_trust_source_path=repo_codex_hooks_path(),
         )
 
     def _transcript_snapshot_root(self, cwd: Path) -> Path:

@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from scaling_evolve.algorithms.eve.workspace import runtime_hooks
 from scaling_evolve.algorithms.eve.workspace.runtime_hooks import (
     install_workspace_runtime_hooks,
 )
@@ -47,12 +46,9 @@ def test_install_workspace_runtime_hooks_writes_claude_settings(tmp_path: Path) 
     assert settings_payload["hooks"]["PostToolUse"][0]["hooks"][0]["type"] == "command"
 
 
-def test_install_workspace_runtime_hooks_writes_codex_hooks(monkeypatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(
-        runtime_hooks,
-        "repo_codex_hooks_path",
-        lambda: tmp_path / "repo" / ".codex" / "hooks.json",
-    )
+def test_install_workspace_runtime_hooks_leaves_codex_hooks_to_driver_launch(
+    tmp_path: Path,
+) -> None:
     workspace = tmp_path / "workspace"
     driver = CodexExecSessionDriver(run_root=tmp_path / "run-root", rollout_max_turns=12)
     prompt_specs = [
@@ -70,28 +66,19 @@ def test_install_workspace_runtime_hooks_writes_codex_hooks(monkeypatch, tmp_pat
     prompt_payload = json.loads(
         (workspace / ".hooks" / "rollout_prompts.json").read_text(encoding="utf-8")
     )
-    hooks_payload = json.loads((workspace / ".codex" / "hooks.json").read_text(encoding="utf-8"))
 
     assert not (workspace / ".sandbox_config.json").exists()
     assert prompt_payload["version"] == 2
     assert prompt_payload["prompts"] == prompt_specs
-    assert (
-        hooks_payload["hooks"]["PreToolUse"][0]["matcher"]
-        == "Bash|Read|Edit|Write|MultiEdit|Glob|Grep"
-    )
-    assert hooks_payload["hooks"]["SessionStart"][0]["hooks"][0]["type"] == "command"
-    assert hooks_payload["hooks"]["UserPromptSubmit"][0]["hooks"][0]["type"] == "command"
-    assert hooks_payload["hooks"]["PostToolUse"][0]["hooks"][0]["type"] == "command"
+    assert not (workspace / ".codex" / "hooks.json").exists()
 
 
-def test_install_workspace_runtime_hooks_skips_codex_hooks_when_repo_hooks_exist(
-    monkeypatch,
+def test_install_workspace_runtime_hooks_does_not_copy_repo_codex_hooks(
     tmp_path: Path,
 ) -> None:
     repo_hooks_path = tmp_path / "repo" / ".codex" / "hooks.json"
     repo_hooks_path.parent.mkdir(parents=True)
     repo_hooks_path.write_text("{}\n", encoding="utf-8")
-    monkeypatch.setattr(runtime_hooks, "repo_codex_hooks_path", lambda: repo_hooks_path)
     workspace = tmp_path / "workspace"
     driver = CodexExecSessionDriver(run_root=tmp_path / "run-root", rollout_max_turns=12)
 
