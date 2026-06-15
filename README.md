@@ -6,20 +6,23 @@
 
 ### **A decentralized ensemble of coding agents co-evolving with code repositories.**
 
-[![python](https://img.shields.io/badge/-Python_3.13-blue?logo=python&logoColor=white)](https://www.python.org/)
+[![python](https://img.shields.io/badge/-Python_≥3.11-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![hydra](https://img.shields.io/badge/Config-Hydra_1.3-89b8cd)](https://hydra.cc/)
 [![ruff](https://img.shields.io/badge/Code%20Style-Ruff-orange.svg?labelColor=gray)](https://docs.astral.sh/ruff/)<br>
 [![arXiv](https://img.shields.io/badge/arXiv-2605.09018-b31b1b.svg)](https://arxiv.org/abs/2605.09018)
 [![Slack](https://img.shields.io/badge/Slack-Community-4A154B?logo=slack&logoColor=white)](https://join.slack.com/t/eve-mf57726/shared_invite/zt-3xym0tp2c-IZOp3oHMh5Fp7xkQwkGlKg)
 [![license](https://img.shields.io/badge/License-Apache_2.0-blue.svg?labelColor=gray)](LICENSE)
 [![PRs](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/scaling-group/eve/pulls)
+[![GitHub stars](https://img.shields.io/github/stars/scaling-group/eve?style=social)](https://github.com/scaling-group/eve/stargazers)
 
 [Scientific Computing and Intelligence Group (Scaling Group) @ NUS](https://scaling-group.github.io)
+
+**If you find EvE useful, please consider [giving it a star ⭐](https://github.com/scaling-group/eve/stargazers).** Stars help others discover the project.
 
 </div>
 
 <p align="center">
-<a href="https://arxiv.org/abs/2605.09018">Paper</a> &middot; <a href="#overview">Overview</a> &middot; <a href="#supported-agents">Supported Agents</a> &middot; <a href="#how-it-works">How It Works</a> &middot; <a href="#quick-start">Quick Start</a> &middot; <a href="#example-icon-context-length-generalization">Example</a> &middot; <a href="#community">Community</a> &middot; <a href="#citation">Citation</a>
+<a href="https://arxiv.org/abs/2605.09018">Paper</a> &middot; <a href="#overview">Overview</a> &middot; <a href="#supported-agents">Supported Agents</a> &middot; <a href="#how-it-works">How It Works</a> &middot; <a href="#quick-start">Quick Start</a> &middot; <a href="#example-icon-context-length-generalization">Example</a> &middot; <a href="#developer-skills">Skills</a> &middot; <a href="#papers-using-eve">Papers</a> &middot; <a href="#community">Community</a> &middot; <a href="#citation">Citation</a>
 </p>
 
 <p align="center"><b>Unlimited agents, fully autonomous.</b></p>
@@ -63,7 +66,7 @@ Both agents support two modes:
 Agents can be powered in two ways:
 
 - **Subscription**: Codex is included with a ChatGPT subscription; Claude Code is included with a Claude subscription. No API key needed.
-- **API**: Both agents also support pay-per-token API access. Third-party providers (DeepSeek, OpenRouter) are supported through provider routing.
+- **API**: Both agents also support pay-per-token API access. Third-party providers (e.g. OpenRouter) are supported through provider routing.
 
 > [!IMPORTANT]
 > EvE orchestrates third-party coding agents; it does **not** provide unlimited access to any AI service.
@@ -239,6 +242,20 @@ uv run python -m scaling_evolve.algorithms.eve.runner \
 
 See `configs/eve/circle_packing.yaml` and `configs/eve/icon.yaml` for complete working examples.
 
+## Developer Skills
+
+The [`docs/skills/`](docs/skills/) directory contains step-by-step guides for common development tasks:
+
+| Skill | Description |
+|-------|-------------|
+| [`implement-check-subagent`](docs/skills/implement-check-subagent/) | Implement a sanity check subagent for the optimization phase |
+| [`implement-evaluation-steps`](docs/skills/implement-evaluation-steps/) | Define or update evaluation steps |
+| [`implement-subagent`](docs/skills/implement-subagent/) | Implement a custom subagent ([Claude](docs/skills/implement-subagent/claude-subagent.md), [Codex](docs/skills/implement-subagent/codex-subagent.md)) |
+| [`run-circle-packing-smoke`](docs/skills/run-circle-packing-smoke/) | Run a quick end-to-end smoke test |
+| [`writing-skills`](docs/skills/writing-skills/) | Create or edit skills |
+
+These skills are also auto-loaded by Claude Code and Codex when working inside the repo.
+
 ## Community
 
 Questions, feedback, or running into issues? Join our [Slack workspace](https://join.slack.com/t/eve-mf57726/shared_invite/zt-3xym0tp2c-IZOp3oHMh5Fp7xkQwkGlKg).
@@ -263,6 +280,10 @@ We compare three experimental conditions, each run twice independently under ide
 The two EvE runs descend in near-lockstep, converging to almost identical final errors. The Static-Initial runs diverge: one eventually approaches EvE while the other plateaus at a higher level. Static-Final, despite starting from a higher-rated agent, suffers from phase mismatch: the frozen agent was optimized for the late stage of the original EvE run but a fresh search requires early-stage exploration strategies that this agent no longer carries. Continuous evolution is indispensable for both performance and robustness.
 
 The complete raw search traces for all six runs (every solver's source code, agent conversations, guidance updates, and evaluation scores) are available in the [v0.1.0 release](https://github.com/scaling-group/eve/releases/tag/v0.1.0).
+
+## Papers Using EvE
+
+See the full list of papers and citations in [`docs/papers.md`](docs/papers.md).
 
 ## Citation
 
