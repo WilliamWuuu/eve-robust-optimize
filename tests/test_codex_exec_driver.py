@@ -108,6 +108,8 @@ def test_codex_exec_spawn_collects_diff_and_transcript(
         assert "-c" in command
         assert 'model_reasoning_effort="low"' in command
         assert 'web_search="disabled"' in command
+        assert env["CODEX_HOME"] == str(Path(env["HOME"]) / ".codex")
+        assert env["EVE_TEST_SENTINEL"] == "kept"
 
         stdout = "\n".join(
             [
@@ -162,6 +164,10 @@ def test_codex_exec_spawn_collects_diff_and_transcript(
         model="gpt-5.4-mini",
         reasoning_effort="low",
         pricing_table=_PRICING_TABLE,
+        provider_env={
+            "CODEX_HOME": str(tmp_path / "polluted-codex-home"),
+            "EVE_TEST_SENTINEL": "kept",
+        },
     )
     rollout = driver.spawn(
         SessionSeed(
@@ -331,6 +337,28 @@ def test_codex_exec_driver_config_accepts_driver_literal() -> None:
     )
 
     assert provider.driver == "codex_exec"
+
+
+def test_codex_exec_launch_config_uses_workspace_hooks(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    repo_hooks_path = tmp_path / "repo" / ".codex" / "hooks.json"
+    monkeypatch.setattr(
+        "scaling_evolve.providers.agent.drivers.codex_exec.repo_codex_hooks_path",
+        lambda: repo_hooks_path,
+    )
+    worktree = tmp_path / "workspace"
+    driver = CodexExecSessionDriver(run_root=tmp_path / "run-root")
+
+    launch = driver._launch_config(worktree)  # noqa: SLF001
+
+    assert launch.worktree_root == worktree
+    assert launch.hooks_json_path == worktree / ".codex" / "hooks.json"
+    assert launch.hook_trust_source_path == repo_hooks_path
+    assert launch.trusted_project_roots == ()
+    assert launch.project_root_markers == ()
+    assert (worktree / ".codex" / "hooks.json").exists()
 
 
 def test_codex_exec_run_command_enforces_rollout_max_turns(tmp_path: Path) -> None:

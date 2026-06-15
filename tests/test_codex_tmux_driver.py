@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -20,6 +22,36 @@ _PRICING_TABLE = {
         cache_read_per_million=0.075,
     ),
 }
+
+
+def _bump_fake_live_session_mtime(session_path: Path) -> None:
+    # Some CI/NFS filesystems can report write mtimes just before the driver's
+    # nanosecond launch timestamp. Keep fake live transcripts discoverable by
+    # latest_rollout_path(after_mtime_ns=...).
+    future_ns = time.time_ns() + 1_000_000_000
+    os.utime(session_path, ns=(future_ns, future_ns))
+
+
+def test_codex_tmux_launch_config_uses_workspace_hooks(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    repo_hooks_path = tmp_path / "repo" / ".codex" / "hooks.json"
+    monkeypatch.setattr(
+        "scaling_evolve.providers.agent.drivers.codex_tmux.repo_codex_hooks_path",
+        lambda: repo_hooks_path,
+    )
+    worktree = tmp_path / "workspace"
+    driver = CodexTmuxSessionDriver(pane_id="%9", run_root=tmp_path / "run-root")
+
+    launch = driver._launch_config(worktree)  # noqa: SLF001
+
+    assert launch.worktree_root == worktree
+    assert launch.hooks_json_path == worktree / ".codex" / "hooks.json"
+    assert launch.hook_trust_source_path == repo_hooks_path
+    assert launch.trusted_project_roots == ()
+    assert launch.project_root_markers == ()
+    assert (worktree / ".codex" / "hooks.json").exists()
 
 
 def test_codex_tmux_spawn_collects_done_file_diff_and_session_log(
@@ -49,6 +81,8 @@ def test_codex_tmux_spawn_collects_done_file_diff_and_session_log(
         assert 'model_reasoning_effort="low"' in argv
         assert pane_title == "Gen ? | TASK | Slot ?"
         assert banner_lines[0] == "Gen ? | TASK | Slot ?"
+        assert env["CODEX_HOME"] == str(Path(env["HOME"]) / ".codex")
+        assert env["EVE_TEST_SENTINEL"] == "kept"
         candidate.write_text("x = 2\n", encoding="utf-8")
         subprocess.run(["git", "-C", str(worktree), "add", "candidate.py"], check=True)
         subprocess.run(["git", "-C", str(worktree), "commit", "-qm", "probe"], check=True)
@@ -78,6 +112,7 @@ def test_codex_tmux_spawn_collects_done_file_diff_and_session_log(
             + "\n",
             encoding="utf-8",
         )
+        _bump_fake_live_session_mtime(session_path)
 
     monkeypatch.setattr(
         "scaling_evolve.providers.agent.drivers.codex_tmux.launch_in_pane",
@@ -104,6 +139,10 @@ def test_codex_tmux_spawn_collects_done_file_diff_and_session_log(
         model="gpt-5.4-mini",
         reasoning_effort="low",
         pricing_table=_PRICING_TABLE,
+        provider_env={
+            "CODEX_HOME": str(tmp_path / "polluted-codex-home"),
+            "EVE_TEST_SENTINEL": "kept",
+        },
     )
     rollout = driver.spawn(
         SessionSeed(
@@ -176,6 +215,7 @@ def test_codex_tmux_spawn_uses_explicit_display_context_for_pane_title(
             + "\n",
             encoding="utf-8",
         )
+        _bump_fake_live_session_mtime(session_path)
 
     monkeypatch.setattr(
         "scaling_evolve.providers.agent.drivers.codex_tmux.launch_in_pane",
@@ -251,6 +291,7 @@ def test_codex_tmux_spawn_can_use_existing_prompt_file_without_rewriting_it(
             + "\n",
             encoding="utf-8",
         )
+        _bump_fake_live_session_mtime(session_path)
 
     monkeypatch.setattr(
         "scaling_evolve.providers.agent.drivers.codex_tmux.launch_in_pane",
@@ -326,6 +367,7 @@ def test_codex_tmux_spawn_synthesizes_completion_when_agent_exits_without_file(
             + "\n",
             encoding="utf-8",
         )
+        _bump_fake_live_session_mtime(session_path)
 
     monkeypatch.setattr(
         "scaling_evolve.providers.agent.drivers.codex_tmux.launch_in_pane",
@@ -521,6 +563,7 @@ def test_codex_tmux_spawn_enables_search_only_when_requested(
             + "\n",
             encoding="utf-8",
         )
+        _bump_fake_live_session_mtime(session_path)
 
     monkeypatch.setattr(
         "scaling_evolve.providers.agent.drivers.codex_tmux.launch_in_pane",
@@ -595,6 +638,7 @@ def test_codex_tmux_spawn_explicitly_disables_search_features_by_default(
             + "\n",
             encoding="utf-8",
         )
+        _bump_fake_live_session_mtime(session_path)
 
     monkeypatch.setattr(
         "scaling_evolve.providers.agent.drivers.codex_tmux.launch_in_pane",
@@ -745,6 +789,7 @@ def test_codex_tmux_resume_uses_same_session_and_workspace_driver_home(
             + "\n",
             encoding="utf-8",
         )
+        _bump_fake_live_session_mtime(session_path)
 
     wait_calls: list[tuple[Path | None, int, str | None]] = []
 
@@ -885,6 +930,7 @@ def test_codex_tmux_waits_for_root_turn_task_complete_not_subagent_completion(
             + "\n",
             encoding="utf-8",
         )
+        _bump_fake_live_session_mtime(session_path)
 
     monkeypatch.setattr(
         "scaling_evolve.providers.agent.drivers.codex_tmux.launch_in_pane",

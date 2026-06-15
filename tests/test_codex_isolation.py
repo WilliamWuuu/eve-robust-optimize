@@ -29,7 +29,12 @@ def test_create_isolated_codex_home_symlinks_auth_and_writes_minimal_config(tmp_
     assert isolated.auth_path.is_symlink()
     assert isolated.auth_path.resolve() == source_auth.resolve()
     assert isolated.auth_path.read_text(encoding="utf-8") == '{"token":"abc"}\n'
+    assert isolated.env() == {
+        "HOME": str(isolated.root),
+        "CODEX_HOME": str(isolated.codex_dir),
+    }
     assert "[features]" in config_text
+    assert "project_root_markers = []" in config_text
     assert "hooks = true" in config_text
     assert "codex_hooks = true" not in config_text
     assert "model = " not in config_text
@@ -57,16 +62,19 @@ def test_create_isolated_codex_home_copies_trusted_hook_state(
     real_home = tmp_path / "real-home"
     config_path = real_home / ".codex" / "config.toml"
     config_path.parent.mkdir(parents=True)
-    hooks_json_path = tmp_path / "repo" / ".codex" / "hooks.json"
-    hooks_json_path.parent.mkdir(parents=True)
-    hooks_json_path.write_text("{}\n", encoding="utf-8")
+    repo_hooks_path = tmp_path / "repo" / ".codex" / "hooks.json"
+    repo_hooks_path.parent.mkdir(parents=True)
+    repo_hooks_path.write_text("{}\n", encoding="utf-8")
+    workspace_hooks_path = tmp_path / "workspace" / ".codex" / "hooks.json"
+    workspace_hooks_path.parent.mkdir(parents=True)
+    workspace_hooks_path.write_text("{}\n", encoding="utf-8")
     other_hooks_path = tmp_path / "other" / ".codex" / "hooks.json"
     entries = []
     for event in CODEX_HOOK_TRUST_EVENTS:
         entries.append(
             "\n".join(
                 [
-                    f'[hooks.state."{hooks_json_path.resolve()}:{event}:0:0"]',
+                    f'[hooks.state."{repo_hooks_path.resolve()}:{event}:0:0"]',
                     f'trusted_hash = "sha256:{event}"',
                     "",
                 ]
@@ -89,17 +97,19 @@ def test_create_isolated_codex_home_copies_trusted_hook_state(
         source_auth_path=None,
         launch=CodexLaunchConfig(
             worktree_root=tmp_path / "workspace",
-            hooks_json_path=hooks_json_path,
+            hooks_json_path=workspace_hooks_path,
+            hook_trust_source_path=repo_hooks_path,
         ),
     )
 
     config_text = isolated.config_path.read_text(encoding="utf-8")
     for event in CODEX_HOOK_TRUST_EVENTS:
-        assert f"{hooks_json_path.resolve()}:{event}:0:0" in config_text
+        assert f"{workspace_hooks_path.resolve()}:{event}:0:0" in config_text
         assert f'trusted_hash = "sha256:{event}"' in config_text
     assert f"[projects.{str((tmp_path / 'workspace').resolve())!r}]" not in config_text
     assert f'[projects."{(tmp_path / "workspace").resolve()}"]' in config_text
-    assert f'[projects."{(tmp_path / "repo").resolve()}"]' in config_text
+    assert f'[projects."{(tmp_path / "repo").resolve()}"]' not in config_text
+    assert str(repo_hooks_path.resolve()) not in config_text
     assert str(other_hooks_path.resolve()) not in config_text
 
 
