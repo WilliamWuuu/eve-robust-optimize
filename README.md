@@ -283,9 +283,12 @@ The complete raw search traces for all six runs (every solver's source code, age
 
 ## Papers Using EvE
 
-See the full list of papers and citations in [`docs/papers.md`](docs/papers.md).
+See additional papers using EvE and their BibTeX entries in [`docs/papers.md`](docs/papers.md).
+If you use EvE in your work, we welcome pull requests to add your paper to the list.
 
 ## Citation
+
+Please cite our paper if you use EvE in your research:
 
 ```bibtex
 @article{yu2026eve,
