@@ -284,8 +284,9 @@ def _build_claude_code_tmux_driver(
         disallowed_tools=disallowed_tools,
         dangerously_skip_permissions=_bool_config(
             driver_cfg.get("dangerously_skip_permissions"),
-            default=True,
+            default=False,
         ),
+        permission_mode=driver_cfg.get("permission_mode", "auto"),
         token_pricing=_token_pricing_from_driver_cfg(driver_cfg),
         pricing_table=pricing_table,
         owns_pool=owns_pool,

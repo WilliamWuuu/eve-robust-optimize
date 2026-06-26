@@ -92,7 +92,8 @@ class ClaudeCodeTmuxSessionDriver(SessionDriver):
         role: str | None = None,
         setting_sources: tuple[str, ...] = ("project", "local"),
         disallowed_tools: tuple[str, ...] = (),
-        dangerously_skip_permissions: bool = True,
+        dangerously_skip_permissions: bool = False,
+        permission_mode: str | None = None,
         token_pricing: TokenPricing | None = None,
         pricing_table: Mapping[str, TokenPricing] | None = None,
         owns_pool: bool = False,
@@ -114,6 +115,12 @@ class ClaudeCodeTmuxSessionDriver(SessionDriver):
         self.setting_sources = tuple(source for source in setting_sources if source)
         self.disallowed_tools = tuple(tool for tool in disallowed_tools if tool)
         self.dangerously_skip_permissions = dangerously_skip_permissions
+        if permission_mode is not None:
+            self.permission_mode = permission_mode
+        elif dangerously_skip_permissions:
+            self.permission_mode = "bypassPermissions"
+        else:
+            self.permission_mode = "auto"
         self.token_pricing = resolve_token_pricing(model, token_pricing, pricing_table)
         self.owns_pool = owns_pool
 
@@ -446,8 +453,7 @@ class ClaudeCodeTmuxSessionDriver(SessionDriver):
             command.extend(["--setting-sources", ",".join(self.setting_sources)])
         if self.disallowed_tools:
             command.extend(["--disallowedTools", ",".join(self.disallowed_tools)])
-        if self.dangerously_skip_permissions:
-            command.append("--dangerously-skip-permissions")
+        command.extend(["--permission-mode", self.permission_mode])
         if session_id is not None:
             command.extend(["--resume", session_id])
         prompt = instruction.strip()

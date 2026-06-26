@@ -72,7 +72,8 @@ class ClaudeCodeSessionDriver(SessionDriver):
         api_key_env: str | None = None,
         auth_token: str | None = None,
         model: str | None = None,
-        dangerously_skip_permissions: bool = True,
+        dangerously_skip_permissions: bool = False,
+        permission_mode: str | None = None,
         disallowed_tools: Sequence[str] = (),
         isolate_config: bool = False,
         temperature: float = 1.0,
@@ -103,6 +104,12 @@ class ClaudeCodeSessionDriver(SessionDriver):
         self.auth_token = auth_token
         self.model = model
         self.dangerously_skip_permissions = dangerously_skip_permissions
+        if permission_mode is not None:
+            self.permission_mode = permission_mode
+        elif dangerously_skip_permissions:
+            self.permission_mode = "bypassPermissions"
+        else:
+            self.permission_mode = "auto"
         self.disallowed_tools = tuple(tool for tool in disallowed_tools if tool)
         self.isolate_config = isolate_config
         self.temperature = temperature
@@ -253,9 +260,9 @@ class ClaudeCodeSessionDriver(SessionDriver):
             self.executable,
             "-p",
         ]
-        if self.dangerously_skip_permissions:
-            command.append("--dangerously-skip-permissions")
         command += [
+            "--permission-mode",
+            self.permission_mode,
             "--verbose",
             "--output-format",
             "stream-json",

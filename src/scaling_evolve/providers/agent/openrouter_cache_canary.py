@@ -197,7 +197,7 @@ def run_canary(
             [
                 "claude",
                 "-p",
-                "--dangerously-skip-permissions",
+                "--permission-mode", "auto",
                 "--verbose",
                 "--output-format",
                 "stream-json",
