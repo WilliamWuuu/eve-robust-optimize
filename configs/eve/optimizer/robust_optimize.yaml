@@ -1,0 +1,14 @@
+# @package _global_
+# Robust optimize optimizer definition
+
+optimizer:
+  initial_optimizer: configs/eve/optimizer/robust_optimize/initial_optimizer
+  immutable: configs/eve/optimizer/robust_optimize/immutable
+  prompt: configs/eve/optimizer/robust_optimize/prompt
+  immutable_renderer:
+    _target_: scaling_evolve.algorithms.eve.workspace.immutable_renderers.default.DefaultRenderer
+  evaluation:
+    _target_: scaling_evolve.algorithms.eve.populations.evaluators.elo.ScalarEloEvaluator
+    k_factor: 32.0
+    initial_score:
+      elo: 1500.0

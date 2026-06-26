@@ -1,0 +1,159 @@
+# Evolutionary Ensemble (EvE) Overview
+
+## Core Concepts
+
+EvE maintains two coupled populations:
+
+- `solver`: code or files that directly work on the downstream task repo. In
+  Phase 2, the agent edits a solver candidate inside `output/` and that
+  candidate is then evaluated on the concrete task.
+- `optimizer`: markdown guidance files that improve solvers, including
+  description, skills, suggestions, etc. They will be applied into a
+  Phase 2 workspace to help the solver-optimization agent.
+
+The loop runs in three phases:
+
+1. Phase 1 samples reference optimizers and reference solvers from the current
+   populations.
+2. Phase 2 applies each sampled optimizer to sampled solver examples to produce
+   a new solver candidate, and optionally a revised optimizer in the same step,
+   then evaluates the solver candidate on the task.
+3. Phase 3 updates optimizer scores from the relative performance of the solver
+   candidates produced in Phase 2.
+
+## Workspace
+
+### Terminology
+
+- `run root`: the outer Eve run directory for one whole experiment. It contains run-level artifacts such as databases, artifact stores, and all per-phase workspaces. Agents do not work directly in the run root.
+- `phase workspace root`: the directory for one concrete Phase 2 agent run. When these instructions say `guidance/`, the reference example directories, `output/`, `logs/`, `README.md`, or `score.yaml`, they mean paths relative to the current phase workspace root.
+- `output/`: the submission tree inside the current phase workspace root. Files under `output/` are the candidate result that will be extracted after the run.
+- `logs/optimize/`: the optimization log directory inside the current phase workspace root. Use it for notes, intermediate artifacts, and debugging material that should be preserved as run logs, but should not become part of the candidate submission under `output/`.
+
+### Solver Workspace (Phase 2)
+
+```text
+phase_workspace_root/
+├── AGENTS.md        ← workspace agent instructions
+├── CLAUDE.md        ← workspace agent instructions
+├── README.md        ← workspace-specific notes, must read.
+├── guidance/        ← optimizer guidance files copied from the selected optimizer
+│   └── skills/      ← optional skill tree; exposed through `.claude/skills`
+│                       and `.codex/skills`
+├── .claude/
+│   ├── agents/
+│   │   └── check-runner.md   ← predefined Claude check sub-agent, copied from config
+│   └── skills -> ../guidance/skills
+├── .codex/
+│   ├── agents/
+│   │   └── check-runner.toml ← predefined Codex check sub-agent, copied from config
+│   └── skills -> ../guidance/skills
+├── solver_examples/ ← sampled reference solvers when
+│                       `n_optimizer_examples_phase2 > 0`
+│   └── <solver_id>/
+│       ├── solver/   ← editable files from that solver example
+│       ├── logs/     ← logs for that solver example
+│       │   └── evaluate/     ← only evaluation logs are kept here
+│       └── score.yaml ← evaluation score for that example
+├── guidance_examples/ ← sampled reference optimizers when
+│                         `n_optimizer_examples_phase2 > 0`
+│   └── <optimizer_id>/
+│       ├── optimizer/ ← optimizer files
+│       ├── logs/      ← optimizer logs copied from storage
+│       └── score.yaml ← current optimizer score
+├── examples/        ← sampled reference solvers when
+│                       `n_optimizer_examples_phase2 <= 0`
+│   └── <solver_id>/
+│       ├── solver/   ← editable files from that solver example
+│       ├── logs/     ← logs for that solver example
+│       │   └── evaluate/     ← only evaluation logs are kept here
+│       └── score.yaml ← evaluation score for that example
+├── output/          ← downstream task repo; editable files are prefilled
+│                       from a solver in the active solver example directory.
+│                       This is the submission tree.
+├── logs/
+│   ├── optimize/    ← free-form log tree from this Phase 2 optimization run
+│   └── evaluate/    ← free-form log tree from evaluating the produced candidate
+└── score.yaml       ← scores for the sampled solvers, the prefill solver, and the
+                        produced solver
+```
+
+### Phase Workspace Lifecycle
+
+Each phase workspace directory is named `<timestamp>_<id>` and is never deleted
+after use. All phase workspaces accumulate on disk and can be inspected after
+the fact.
+
+```text
+1. Build    fetch files and logs from database
+
+2. Run      agent session executes in this directory
+
+3. Extract  read output file(s) from the directory
+            store as new entry in the database
+```
+
+If the agent exhausts its token budget without producing a valid output, step 3
+is skipped and the run is recorded as failed in the database. The phase
+workspace directory is retained either way.
+
+# Workspace Notes
+
+Current phase: Phase 2 solver and optimizer optimization.
+
+{editable_files_block}
+{editable_folders_block}
+
+## Your Task
+
+Treat `guidance/` as the current supporting guidance.
+
+Your primary goal is to produce an improved solver candidate in `output/`. You should also improve the files in `guidance/` to distill your experience.
+
+In this document, all paths are relative to the current phase workspace root unless stated otherwise. `output/` is the solver submission tree. `guidance/` is the optimizer-guidance tree for this phase workspace. `logs/optimize/` is a sibling optimization log directory under the same phase workspace root.
+
+**MANDATORY:** Before you stop, you MUST invoke the predefined `check-runner` sub-agent from `.claude/agents/check-runner.md` or `.codex/agents/check-runner.toml`, depending on which runtime you are using. Have it execute its configured check workflow from the workspace root. The check-runner will provide necessary sanity checks without formal evaluation. Do NOT finish without running this check. If anything fails, repair the output and rerun the check until it passes.
+
+Write any important optimization notes, intermediate artifacts, or debugging material directly into `logs/optimize/` while you work. The main program will preserve that directory as collected run logs and save your final response there.
+
+Do not ask the human for clarification, approval, or feedback at any point during this run. Do the work autonomously, finish your edits, provide your final summary, and stop.
+
+`output/` is pre-filled with the files from one of the reference examples. You may modify any editable files/folders within `output/`. You may also modify optimizer files inside `guidance/`. When you are satisfied, the editable files in `output/` will be extracted as the solver candidate submission, changed files in `guidance/` may be extracted as a new optimizer candidate, and `logs/optimize/` will be preserved separately as run logs.
+
+## About This Project
+
+You are improving the methods in a PDE-constrained optimization framework (`robust_optimize`). The goal is to minimize the mismatch between a learned neural operator surrogate and the true PDE solver when solving optimal control problems.
+
+The pipeline has two phases:
+1. **Phase 1 (Operator Training)**: Train a neural operator G_θ: m → u as a fast surrogate for the PDE solver. Currently uses Fourier Neural Operator (FNO) with optional adversarial training (PGD-based).
+2. **Phase 2 (Control Optimization)**: Freeze G_θ and use it as a differentiable surrogate to optimize controls m that minimize a tracking objective + regularization.
+
+Three PDE problems are implemented:
+- **Poisson 2D**: `-Δu = m`, control is heat source, objective tracks desired temperature
+- **Burgers 1D**: `∂u/t + u·∂u/∂x = ν·∂²u/∂x² + m`, control is external forcing
+- **Darcy 3D**: `-div(exp(m)·∇u) = q`, control is log-permeability field
+
+The evaluation score measures: operator prediction accuracy, optimization result accuracy, and the alignment between surrogate-predicted and true objective values.
+
+The key files to focus your improvements on:
+- `src/robust_optimize/training.py` — the Phase 1 training loop (adversarial training strategy, loss functions, curriculum design)
+- `src/robust_optimize/optimization.py` — the Phase 2 optimization loop (optimizer choice, initialization, regularization)
+- `src/robust_optimize/models/operators.py` — the FNO architecture (depth, width, activations)
+- `src/robust_optimize/utils/attacks.py` — the PGD adversarial attack implementation
+
+The following files are part of the editable surface but should generally NOT be modified unless you have a strong reason:
+- `src/robust_optimize/datasets/` — data loading and problem definitions (evaluation depends on these)
+- `src/robust_optimize/utils/numeric.py` — FDM solvers (used as ground truth in evaluation)
+- `src/robust_optimize/config.py` — config loader
+
+## Reference Solver Examples
+
+You have a few reference example(s). Their score cards are shown below:
+
+{solver_examples_block}
+
+{optimizer_examples_block}
+
+## Score Semantics
+
+Higher solver score is better.

@@ -1,0 +1,25 @@
+# @package _global_
+# Robust PDE-constrained optimization application definition
+
+application:
+  name: robust-optimize
+  source_root: /wuyangxin/robust_optimize_clean
+  github_url: null
+  commit: null
+  editable:
+    files: []
+    folders:
+      - src/robust_optimize
+  check_agent:
+    claude: configs/eve/application/robust_optimize/check_claude.md
+    codex: configs/eve/application/robust_optimize/check_codex.toml
+  evaluation_steps:
+    - configs/eve/application/robust_optimize/evaluation.sh
+  evaluation_failure_score:
+    score: 0.0
+    summary: evaluation failed
+  boundary_failure_score:
+    score: 0.0
+    summary: boundary check failed
+  seed_solver_score: null
+  seed_solver_skip_evaluation: false

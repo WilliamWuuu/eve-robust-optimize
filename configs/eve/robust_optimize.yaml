@@ -1,0 +1,21 @@
+# Run: uv run python -m scaling_evolve.algorithms.eve.runner --config-name=robust_optimize
+
+defaults:
+  - runtime: default
+  - loop: default
+  - driver: claude_noninteractive_robust_optimize
+  - logger: swanlab
+  - application: robust_optimize
+  - optimizer: robust_optimize
+  - _self_
+
+label: robust-optimize
+
+loop:
+  max_iterations: 20
+  n_workers_phase2: 2
+  n_solver_examples_phase2: 10
+
+logger:
+  project: eve-robust-optimize
+  api_key: mrfXxnIGXukUKn8o8mZI9

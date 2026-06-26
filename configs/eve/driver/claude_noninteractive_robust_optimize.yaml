@@ -1,0 +1,18 @@
+# @package _global_
+# Claude Code non-interactive (subprocess) driver tuned for robust optimize research runs.
+
+driver:
+  driver: claude_code
+  executable: claude
+  model: opus[1m]
+  effort_level: high
+  web_search: disabled
+  setting_sources: [project, local]
+  rollout_max_turns: 20
+  timeout_seconds: 1800
+  overrides:
+    solver:
+      effort_level: high
+    eval:
+      model: opus[1m]
+      effort_level: high

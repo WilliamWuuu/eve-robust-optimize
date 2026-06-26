@@ -1,0 +1,13 @@
+# Run: uv run python -m scaling_evolve.algorithms.eve.runner --config-name=robust_optimize.smoke
+
+defaults:
+  - robust_optimize
+  - _self_
+
+label: robust-optimize-smoke
+
+loop:
+  max_iterations: 3
+
+driver:
+  rollout_max_turns: 3
