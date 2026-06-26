@@ -1,0 +1,14 @@
+# @package _group_
+# SwanLab native logger
+
+_target_: scaling_evolve.algorithms.eve.logger.SwanLabEveLogger
+enabled: true
+project: eve
+# Set to override the experiment name shown in the SwanLab dashboard.
+# Defaults to the run_id when null.
+name: Yangxin
+description: null
+# Local log directory.  Defaults to SwanLab's own default (./swanlog) when null.
+log_dir: null
+excluded_score_fields:
+  - info
